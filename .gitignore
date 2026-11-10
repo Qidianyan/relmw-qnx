@@ -1,0 +1,5 @@
+build*/
+.dsh-runs/
+secrets/
+*.env
+results/*.tmp
