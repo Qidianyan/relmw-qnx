@@ -35,5 +35,9 @@ neg "unknown sched_param member" '#include <sched.h>
 int f(){ struct sched_param p; return p.sched_ss_budget; }'
 neg "MsgReceivePulse() with 3 args" '#include <sys/neutrino.h>
 int f(int c, struct _pulse* p){ return MsgReceivePulse(c, p, sizeof *p); }'
+neg "pthread_cluster_set() with 1 arg" '#include <pthread.h>
+int f(){ return pthread_cluster_set("_cpu-0"); }'
+neg "pthread_cluster_get_runmask() with unsigned*" '#include <pthread.h>
+int f(unsigned* m){ return pthread_cluster_get_runmask("_all", m); }'
 [ $rc -eq 0 ] && echo "qnx_syntax_check: all QNX translation units pass -fsyntax-only against 8.0 stubs"
 exit $rc

@@ -40,6 +40,12 @@ class PeriodicTimer {
 bool set_thread_sched(const std::string& policy, int priority, int low_priority = 0,
                       std::int64_t budget_ns = 0, std::int64_t period_ns = 0, std::string* err = nullptr);
 
+// CPU affinity of the CALLING thread, by QNX cluster name: "_all" (every CPU), "_cpu-N" (CPU N, 0-based); on QNX also
+// custom clusters defined by the startup program (-c). POSIX host: "_all" and "_cpu-N" only (pthread_setaffinity_np).
+bool set_thread_cluster(const std::string& name, std::string* err = nullptr);
+// Human-readable affinity of the calling thread, e.g. "cpus=1 mask=0x2" (POSIX: from pthread_getaffinity_np).
+std::string thread_affinity_text();
+
 // Structured logging (QNX: slog2 buffer "relmw"; POSIX: stderr with monotonic timestamp).
 enum class Level { Debug, Info, Warn, Error };
 void log_init(const char* buffer_name);

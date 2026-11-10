@@ -40,6 +40,14 @@ std::vector<Subtask> make_task(TruthSensor& truth, std::uint64_t ep);
 EpisodeResult run_episode(int ep, bool field, Arm arm, RetryPolicy* rp, const ExperimentConfig& cfg,
                           EventSink sink = nullptr);
 
+// Plan control (F2): parse a comma-separated plan CSV ("push_B,push_A") into items. Rules: non-empty items, no
+// spaces, names [A-Za-z0-9_]+, at most 8 items. On error `out` is cleared, false is returned and `err` explains.
+bool parse_plan(const std::string& csv, std::vector<std::string>& out, std::string* err);
+
+// Reorder/filter `task` in place to the plan order. A valid plan is non-empty, has no duplicates and names only
+// subtasks present in `task`. On any error `task` is left unchanged, false is returned and `err` explains.
+bool apply_plan(std::vector<Subtask>& task, const std::vector<std::string>& plan, std::string* err);
+
 // Full benchmark (warm-up + nominal/field x 3 arms). Writes summary JSON + per-episode JSONL.
 struct BenchOutput { std::string summary_json; std::string episodes_jsonl; std::string library_txt; std::string table; };
 BenchOutput run_benchmark(const ExperimentConfig& cfg);

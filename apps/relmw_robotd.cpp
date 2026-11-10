@@ -5,7 +5,7 @@
 // messages over the robot link (POSIX: AF_UNIX SOCK_SEQPACKET; QNX: /dev/robot0 resmgr, wired by
 // the reviewer). One request -> one reply, synchronous, like QNX MsgSend/MsgReceive/MsgReply.
 //
-//   relmw_robotd [--path P] [--quit-after-requests N]
+//   relmw_robotd [--path P] [--quit-after-requests N] [--cpu N | --cluster NAME]
 //
 // Default path: /tmp/relmw_robot0.sock on POSIX (/dev/robot0 on QNX). SIGINT/SIGTERM -> clean exit
 // (socket unlinked). --quit-after-requests N = exit(3) after N requests (crash simulation for the
@@ -39,12 +39,15 @@ const char* kDefaultPath = "/tmp/relmw_robot0.sock";
 int main(int argc, char** argv) {
   std::string path = kDefaultPath;
   long quit_after = 0;
+  std::string cluster;
   for (int i = 1; i < argc; ++i) {
     std::string a = argv[i];
     auto next = [&]() -> std::string { if (i + 1 >= argc) { std::fprintf(stderr, "missing value for %s\n", a.c_str()); std::exit(2); } return argv[++i]; };
     if (a == "--path") path = next();
     else if (a == "--quit-after-requests") quit_after = std::atol(next().c_str());
-    else { std::fprintf(stderr, "usage: %s [--path P] [--quit-after-requests N]\n", argv[0]); return 2; }
+    else if (a == "--cpu") cluster = "_cpu-" + next();   // validated strictly by set_thread_cluster
+    else if (a == "--cluster") cluster = next();
+    else { std::fprintf(stderr, "usage: %s [--path P] [--quit-after-requests N] [--cpu N | --cluster NAME]\n", argv[0]); return 2; }
   }
   pf::log_init("relmw_robotd");
   pf::log(pf::Level::Info, "relmw_robotd start: path=%s quit_after=%ld", path.c_str(), quit_after);
@@ -67,6 +70,14 @@ int main(int argc, char** argv) {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
       }
     }).detach();
+  }
+  // Pin the serving thread (this thread) to a CPU cluster before entering the serve loop; warn and continue on
+  // failure (an unpinned server still works, just without the requested affinity).
+  if (!cluster.empty()) {
+    std::string ce;
+    if (!pf::set_thread_cluster(cluster, &ce))
+      pf::log(pf::Level::Warn, "set_thread_cluster(%s) failed: %s (continuing on default affinity)",
+              cluster.c_str(), ce.c_str());
   }
   const int rc = robot_serve(path, server, g_quit, &err);
   if (rc != 0) {

@@ -4,6 +4,7 @@
 //  * Periodic tick = kernel timer (timer_create, CLOCK_MONOTONIC) delivering a PULSE to a private channel;
 //    the control thread blocks in MsgReceivePulse() -> no signals, no polling, priority-inherited delivery.
 //  * set_thread_sched(): SCHED_FIFO / SCHED_RR / SCHED_SPORADIC (budgeted real-time server).
+//  * set_thread_cluster() / thread_affinity_text(): runmask by cluster name (pthread_cluster_set, ThreadCtl).
 //  * watchdog_*(): High Availability Manager self-attach + heartbeat (libham).
 // API signatures checked against the QNX SDP 8.0 C Library Reference and HAM Developer's Guide (2026-11-10):
 //   ChannelCreate, ConnectAttach, SIGEV_PULSE_INIT, MsgRegisterEvent, timer_create, MsgReceivePulse, MsgSendPulse,
@@ -14,6 +15,7 @@
 #include <ha/ham.h>
 #include <pthread.h>
 #include <sched.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/neutrino.h>
@@ -131,6 +133,37 @@ bool set_thread_sched(const std::string& policy, int priority, int low_priority,
   int rc = pthread_setschedparam(pthread_self(), pol, &sp);
   if (rc != EOK) { if (err) *err = strerror(rc); return false; }
   return true;
+}
+
+// CPU affinity (checklist C8). QNX 8.0: pthread_cluster_set(0, name) sets the calling thread's runmask from a cluster
+// ("_all", "_cpu-N", or a cluster defined with startup-* -c); EINVAL if the name is unknown. The name is validated first
+// with pthread_cluster_get_runmask() so the error message can include the runmask. Only the RUNMASK changes: the
+// inherit mask stays as it was, so threads created later by this thread keep the default affinity (unlike Linux, where
+// new threads inherit the creator's mask). The control channel is created with _NTO_CHF_INHERIT_RUNMASK only by the
+// robot driver (qnx_robot_link.cpp), so its server threads follow the client's runmask.
+bool set_thread_cluster(const std::string& name, std::string* err) {
+  uint64_t mask = 0;
+  int rc = pthread_cluster_get_runmask(name.c_str(), &mask);
+  if (rc != EOK) {
+    if (err) *err = "EINVAL unknown cluster \"" + name + "\" (predefined: _all, _cpu-N; others need startup -c)";
+    return false;
+  }
+  rc = pthread_cluster_set(0, name.c_str());
+  if (rc != EOK) { if (err) *err = std::string("pthread_cluster_set: ") + strerror(rc); return false; }
+  return true;
+}
+
+// _NTO_TCTL_RUNMASK_GET_AND_SET with *data == 0 returns the current runmask without changing it (8.0 ThreadCtl()).
+// That command is limited to 32 cores (EINVAL above), which is fine for the QEMU targets used here.
+std::string thread_affinity_text() {
+  unsigned int rm = 0;
+  if (ThreadCtl(_NTO_TCTL_RUNMASK_GET_AND_SET, &rm) == -1) return std::string("runmask=? (") + strerror(errno) + ")";
+  std::string cpus;
+  for (int i = 0; i < 32; ++i)
+    if (rm & (1u << i)) { if (!cpus.empty()) cpus += ','; cpus += std::to_string(i); }
+  char hex[24];
+  snprintf(hex, sizeof hex, "0x%x", rm);
+  return "cpus=" + (cpus.empty() ? std::string("-") : cpus) + " mask=" + hex;
 }
 
 // Self-attached heartbeat entity. Its name gets a "_hb" suffix so it never collides (EEXIST) with the external

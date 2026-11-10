@@ -4,10 +4,12 @@
 #include "relmw/policy.hpp"
 #include "relmw/stats.hpp"
 #include "relmw/verifier.hpp"
+#include <cctype>
 #include <cstdio>
 #include <map>
 #include <memory>
 #include <sstream>
+#include <utility>
 
 namespace relmw {
 
@@ -55,6 +57,58 @@ EpisodeResult run_episode(int ep, bool field, Arm arm, RetryPolicy* rp, const Ex
   r.gt_success = gt; r.mw_success = rep.success; r.abort_reason = rep.abort_reason; r.failed_at = rep.failed_at;
   r.sim_steps = sim.ticks(); r.attempts = rep.attempts;
   return r;
+}
+
+bool parse_plan(const std::string& csv, std::vector<std::string>& out, std::string* err) {
+  out.clear();
+  auto fail = [&](const std::string& e) {
+    if (err) *err = e;
+    return false;
+  };
+  if (csv.empty()) return fail("plan is empty");
+  std::vector<std::string> items;
+  std::string item;
+  for (size_t i = 0;; ++i) {
+    const bool sep = i == csv.size() || csv[i] == ',';
+    if (sep) {
+      if (item.empty()) return fail("empty subtask name in plan \"" + csv + "\"");
+      items.push_back(item);
+      item.clear();
+      if (i == csv.size()) break;
+    } else {
+      item.push_back(csv[i]);
+    }
+  }
+  if (items.size() > 8) return fail("plan has " + std::to_string(items.size()) + " items (max 8)");
+  for (const auto& s : items) {
+    if (s.find(' ') != std::string::npos) return fail("subtask name \"" + s + "\" must not contain spaces");
+    for (char c : s)
+      if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_')
+        return fail("subtask name \"" + s + "\" must match [A-Za-z0-9_]+");
+  }
+  out = std::move(items);   // commit only when every item is valid: on error `out` stays empty
+  return true;
+}
+
+bool apply_plan(std::vector<Subtask>& task, const std::vector<std::string>& plan, std::string* err) {
+  auto fail = [&](const std::string& e) {
+    if (err) *err = e;
+    return false;
+  };
+  if (plan.empty()) return fail("plan is empty");
+  for (size_t i = 0; i < plan.size(); ++i)
+    for (size_t j = 0; j < i; ++j)
+      if (plan[i] == plan[j]) return fail("duplicate subtask \"" + plan[i] + "\" in plan");
+  std::vector<Subtask> out;  // built fully before touching `task`: on error the task is unchanged
+  for (const auto& name : plan) {
+    const Subtask* found = nullptr;
+    for (const auto& st : task)
+      if (st.name == name) { found = &st; break; }
+    if (!found) return fail("unknown subtask \"" + name + "\" (not in the task)");
+    out.push_back(*found);
+  }
+  task = std::move(out);
+  return true;
 }
 
 namespace {
