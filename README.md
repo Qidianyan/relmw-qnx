@@ -2,9 +2,12 @@
 
 > **Status (2026-11-10): work in progress for the QNX Global Hackathon (Robotics & Medical).**
 > The portable C++ core, host benchmark and tests run today on a Linux host. The QNX 8.0 layer
-> (`src/platform/qnx/`) is written but **has not yet been built with qcc or run on a QNX target** —
-> QEMU evidence will be added under `results/qnx_qemu_x86_64/` once the QNX SDP 8.0 toolchain is installed.
-> Nothing in this README claims QNX results that are not in the repository.
+> (`src/platform/qnx/`) has been reviewed against the QNX SDP 8.0 documentation and passes a host-side
+> `-fsyntax-only` check against transcribed 8.0 API stubs, but **has not yet been built with qcc or run on a
+> QNX target** — QEMU evidence will be added under `results/qnx_qemu_x86_64/` by `scripts/qnx_first_run.sh`
+> once the QNX SDP 8.0 toolchain is installed. Nothing in this README claims QNX results that are not in the repository.
+
+![architecture](docs/architecture.svg)
 
 ## What it does
 Learned robot policies fail in the long tail, and their failures are **correlated**: after a plain
@@ -29,7 +32,7 @@ On QNX it runs as a **real-time supervisor process**:
 | **Resource manager** `/dev/relmw/{status,events,ctl}` (`cat` the state, `echo` commands) | `src/platform/qnx/qnx_resmgr.cpp` |
 | **slog2** event log (`slog2info -b relmw`) | `src/platform/qnx/qnx_log.cpp` |
 | **SCHED_FIFO / SCHED_SPORADIC** control thread | `qnx_timer.cpp` `set_thread_sched()` |
-| **High Availability Manager**: restart on death, heartbeat | `apps/relmw_ham_setup.cpp`, `qnx_timer.cpp` `watchdog_*` |
+| **High Availability Manager**: restart on death; heartbeat entity whose missed-heartbeat condition kills a hung process so the restart takes over; failure library saved atomically and reloaded | `apps/relmw_ham_setup.cpp`, `qnx_timer.cpp` `watchdog_attach()`, `apps/relmw_supervisor.cpp` |
 | Release-latency histogram (p50/p99/max, deadline misses) | `src/platform/latency.cpp`, `relmw_supervisor --report` |
 
 ## Results so far (Linux host, simulation only)
@@ -49,16 +52,46 @@ The verifier had 0 false positives against ground truth. These are simulation nu
 The results are bit-identical between a GCC/libstdc++ build and a Clang/libc++ build (the simulator and
 statistics use a self-contained xoshiro256** RNG, not `<random>` distributions).
 
+Real-time baseline on the Linux host (1 kHz, 30 episodes, `SCHED_OTHER` — `SCHED_FIFO` needs privileges the
+host does not grant; shared 8-core machine):
+
+| run | p50 | p99 | p99.9 | max | releases later than 500 µs |
+|---|---|---|---|---|---|
+| shared machine | 60 µs | 262 µs | 655 µs | 3.1 ms | 9 / 8067 |
+| + 2 busy loops | 54 µs | 1.08 ms | 4.98 ms | 19.3 ms | 79 / 4536 |
+
+Sources: `results/host_linux/rt_report_sched_other_1khz*.json`; all results in one page: `docs/dashboard.html`.
+
 ## Build and run (Linux host)
 ```bash
-scripts/build_host.sh                     # CMake + Ninja, then ctest
-# 8 ctest executables, 70 cases (rng, stats, sim2d, middleware, retry_policy, latency, posix_platform, experiment); zero warnings with g++ 14.2
+scripts/build_host.sh                     # CMake + Ninja, then ctest (12 tests, zero warnings with g++ 14.2)
 build-host/relmw_bench --n 100 --out results/host_linux
-build-host/relmw_supervisor --episodes 20 --period-us 2000 --sched other --mount /tmp/relmw
-#   in another terminal:  cat /tmp/relmw/status ; echo "fault percep_bias" > /tmp/relmw/ctl
+build-host/relmw_supervisor --episodes 0 --period-us 1000 --sched other --mount /tmp/relmw --library /tmp/lib.txt &
+scripts/relmwctl -m /tmp/relmw status
+scripts/relmwctl -m /tmp/relmw fault percep_bias      # prints "OK fault percep_bias"
+scripts/relmwctl -m /tmp/relmw events 10
+scripts/relmwctl -m /tmp/relmw quit
+python3 tools/make_dashboard.py --host results/host_linux --out docs/dashboard.html
+```
+
+Tests (`ctest`): unit tests for rng, stats, sim2d, middleware, retry_policy, latency, POSIX platform,
+end-to-end experiment (70 cases), a real-time no-allocation test (`test_rt_noalloc`: record/step/get_obs/
+wait_tick/now_ns allocate nothing; a whole episode allocates 0.04 times per tick, only at sub-task boundaries),
+a supervisor end-to-end test (control surface, `relmwctl`, library survives a restart), the QNX syntax check,
+and the dashboard tests.
+
+## QNX code checks available before the SDP
+```bash
+scripts/qnx_syntax_check.sh    # g++ -fsyntax-only -D__QNX__ against tools/qnx_stubs (8.0 signatures) + stub self-test
 ```
 
 ## Build and run (QNX SDP 8.0, QEMU x86_64) — to be validated
+One command after the SDP is installed (build → image → boot → tests, bench, RT runs, resmgr demo, slog2, HAM → collect):
+```bash
+QNX_SDP=~/qnx800 scripts/qnx_first_run.sh --preflight   # checks prerequisites only
+QNX_SDP=~/qnx800 scripts/qnx_first_run.sh               # logs in results/qnx_qemu_x86_64/first_run_<UTC>/
+```
+Individual steps:
 ```bash
 QNX_SDP=~/qnx800 scripts/build_qnx.sh x86_64     # qcc/q++ via cmake/qnx-x86_64.cmake
 QNX_SDP=~/qnx800 scripts/qemu_image.sh           # mkqnximage --type=qemu --arch=x86_64 --run
@@ -72,7 +105,7 @@ QNX version: QNX SDP 8.0 (QNX Everywhere non-commercial license). Target: QEMU x
 file provided for Raspberry Pi 5). Toolchain: qcc/q++ (`gcc_ntox86_64`).
 
 ## Layout
-See `docs/` (to come) and the header comments in `include/relmw/*.hpp`. The core (`src/core`) has no OS
+See `docs/architecture.svg`, `docs/dashboard.html` and the header comments in `include/relmw/*.hpp`. The core (`src/core`) has no OS
 calls and is shared by both platforms; QNX-specific code is isolated under `#ifdef __QNX__`.
 
 ## Provenance
@@ -80,4 +113,4 @@ The algorithm comes from our earlier Python/MuJoCo prototype (before 2026-11-02)
 repository was written during the hackathon submission period (first commit 2026-11-10).
 
 ## License
-MIT (see `LICENSE`).
+MIT (see `LICENSE`). Copyright (c) 2026 elidot.
