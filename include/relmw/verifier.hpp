@@ -4,6 +4,10 @@
 
 namespace relmw {
 
+// Safety margin: the camera verifier only accepts a placement this far inside the goal tolerance
+// (same 0.5 cm margin as the Python vision verifier), so sensor noise cannot pass a borderline result.
+constexpr double kVerifierMargin = 0.005;
+
 // Failure taxonomy from an object estimate + robot proprioception (same rules as the Python demo).
 FailureMode classify(Vec2 obj, Vec2 pusher, Vec2 goal);
 

@@ -62,11 +62,18 @@ target_link_libraries(relmw_bench relmw_core)
 add_executable(relmw_supervisor apps/relmw_supervisor.cpp)
 target_link_libraries(relmw_supervisor relmw_platform)
 
+if(RELMW_QNX)
+  add_executable(relmw_ham_setup apps/relmw_ham_setup.cpp)
+  target_link_libraries(relmw_ham_setup ham)
+  target_link_libraries(relmw_platform PUBLIC ham)
+  install(TARGETS relmw_ham_setup DESTINATION bin)
+endif()
+
 install(TARGETS relmw_bench relmw_supervisor DESTINATION bin)
 
 # ---- tests (ctest) ----------------------------------------------------------
 enable_testing()
-foreach(t test_rng test_stats test_sim2d test_middleware test_retry_policy test_latency test_experiment)
+foreach(t test_rng test_stats test_sim2d test_middleware test_retry_policy test_latency test_posix_platform test_experiment)
   if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/${t}.cpp)
     add_executable(${t} tests/${t}.cpp)
     target_link_libraries(${t} relmw_platform)
