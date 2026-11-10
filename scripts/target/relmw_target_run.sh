@@ -40,8 +40,9 @@ run_sup() {  # $1=label $2=sched $3=load(0/1)
   if [ "$3" = 1 ]; then
     for k in 1 2; do ( while :; do :; done ) & LOADPIDS="$LOADPIDS $!"; done   # 2 busy loops at default priority
   fi
+  cp "$OUT/bench/failure_library.txt" "$OUT/lib_$1.txt"     # the supervisor rewrites its library; keep bench output pristine
   step "30_sup_$1" "$BIN/relmw_supervisor" --episodes 30 --period-us 1000 --sched "$2" --prio 40 \
-        --mount "/dev/relmw_$1" --library "$OUT/bench/failure_library.txt" --report "$OUT/rt_report_$1.json"
+        --mount "/dev/relmw_$1" --library "$OUT/lib_$1.txt" --report "$OUT/rt_report_$1.json"
   for p in $LOADPIDS; do stop_pid "$p"; done
 }
 run_sup other_idle other 0
@@ -51,8 +52,9 @@ run_sup fifo_load fifo 1
 run_sup sporadic_load sporadic 1
 
 # 5. Resource manager demo (C1'/C2'): cat status, echo a fault, read the reply back
+cp "$OUT/bench/failure_library.txt" "$OUT/lib_demo.txt"
 "$BIN/relmw_supervisor" --episodes 0 --period-us 1000 --sched fifo --prio 40 --mount /dev/relmw \
-    --library "$OUT/bench/failure_library.txt" > "$OUT/40_resmgr_supervisor.txt" 2>&1 &
+    --library "$OUT/lib_demo.txt" > "$OUT/40_resmgr_supervisor.txt" 2>&1 &
 SUP=$!
 if wait_file /dev/relmw/status 10; then
   {
@@ -80,7 +82,7 @@ step 50_slog2info sh -c "slog2info -b relmw | tail -200"
 if command -v ham >/dev/null; then
   pidin -f an | grep -q '[ /]ham$' || ham
   sleep 1
-  LIB="$OUT/bench/failure_library.txt"
+  LIB="$OUT/lib_ham.txt"; cp "$OUT/bench/failure_library.txt" "$LIB"
   step 60_ham_setup "$BIN/relmw_ham_setup" "$BIN/relmw_supervisor --episodes 0 --period-us 1000 --sched fifo --prio 40 --mount /dev/relmw --library $LIB --ham"
   sleep 3
   P1=$(pidin -f an | awk '/relmw_supervisor/ {print $1; exit}')

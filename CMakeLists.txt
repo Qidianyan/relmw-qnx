@@ -74,6 +74,9 @@ install(TARGETS relmw_bench relmw_supervisor DESTINATION bin)
 # ---- tests (ctest) ----------------------------------------------------------
 enable_testing()
 foreach(t test_rng test_stats test_sim2d test_middleware test_retry_policy test_latency test_posix_platform test_experiment test_rt_noalloc)
+  if(RELMW_QNX AND t STREQUAL "test_posix_platform")
+    continue()   # exercises the POSIX control surface (FIFO files); the QNX layer is covered by scripts/target/relmw_target_run.sh
+  endif()
   if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/${t}.cpp)
     add_executable(${t} tests/${t}.cpp)
     target_link_libraries(${t} relmw_platform)
@@ -83,4 +86,12 @@ endforeach()
 
 if(NOT RELMW_QNX)
   add_test(NAME test_supervisor_e2e COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_supervisor_e2e.sh $<TARGET_FILE:relmw_supervisor> ${CMAKE_CURRENT_SOURCE_DIR}/scripts/relmwctl)
+  # QNX 8.0 layer: -fsyntax-only against transcribed API stubs (+ stub self-test). GCC only (stubs wrap glibc headers).
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    add_test(NAME test_qnx_syntax COMMAND ${CMAKE_COMMAND} -E env CXX=${CMAKE_CXX_COMPILER} bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/qnx_syntax_check.sh)
+  endif()
+  find_package(Python3 COMPONENTS Interpreter)
+  if(Python3_FOUND)
+    add_test(NAME test_dashboard COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_make_dashboard.py)
+  endif()
 endif()

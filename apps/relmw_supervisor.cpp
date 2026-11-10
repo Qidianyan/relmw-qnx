@@ -44,6 +44,7 @@ struct Shared {
   int force_fault = -2;               // -2 = random field faults, -1 = nominal, >=0 forced
   bool paused = false, knock = false;
   std::atomic<bool> quit{false};
+  std::atomic<size_t> lib_entries{0};   // read by the resmgr thread; the map itself is only touched by the control thread
 };
 
 Shared S;
@@ -200,9 +201,10 @@ int main(int argc, char** argv) {
     if (lib.load(library)) pf::log(pf::Level::Info, "failure library loaded: %zu entries", lib.lib.size());
     else pf::log(pf::Level::Warn, "failure library %s not found; starting empty", library.c_str());
   }
+  S.lib_entries = lib.lib.size();
   NaiveRetry naive;
 
-  pf::ControlSurface ctl(mount, {[&] { return status_text(period_ns, lib.lib.size(), library); }, events_text, handle_command});
+  pf::ControlSurface ctl(mount, {[&] { return status_text(period_ns, S.lib_entries.load(), library); }, events_text, handle_command});
   std::string err;
   if (!ctl.start(&err)) pf::log(pf::Level::Warn, "control surface unavailable: %s", err.c_str());
 
@@ -273,9 +275,10 @@ int main(int argc, char** argv) {
       else if (std::rename(tmp.c_str(), library.c_str()) != 0)
         pf::log(pf::Level::Warn, "failed to install failure library %s: %s", library.c_str(), std::strerror(errno));
     }
+    S.lib_entries = lib.lib.size();
     ctl.publish();
   }
-  std::string st = status_text(period_ns, lib.lib.size(), library);
+  std::string st = status_text(period_ns, S.lib_entries.load(), library);
   std::printf("%s", st.c_str());
   if (!report.empty()) {
     std::lock_guard<std::mutex> g(S.mu);
