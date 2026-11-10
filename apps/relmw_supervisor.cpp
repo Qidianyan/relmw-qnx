@@ -9,12 +9,14 @@
 //
 //   relmw_supervisor [--episodes N] [--period-us 2000] [--arm mw|naive|none] [--nominal] [--prio 40]
 //                    [--sched fifo|sporadic|other] [--mount DIR] [--library FILE] [--report FILE] [--ham]
+//                    [--heartbeat-ms N]
 #include "relmw/experiment.hpp"
 #include "relmw/latency.hpp"
 #include "relmw/platform.hpp"
 #include "relmw/policy.hpp"
 #include "relmw/verifier.hpp"
 #include <atomic>
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -61,7 +63,22 @@ void push_event(const std::string& line) {
 
 std::string us(std::int64_t ns) { char b[32]; std::snprintf(b, sizeof b, "%.1f", ns / 1000.0); return b; }
 
-std::string status_text(std::int64_t period_ns, size_t lib_entries) {
+// Watchdog heartbeat by TIME, not by tick count: beat at least every heartbeat_period/2 so that even a paused
+// supervisor (main()'s paused-wait loop) keeps the watchdog alive. heartbeat_period defaults to the named
+// constant kHeartbeatPeriodMs (100 ms) and is overridden by --heartbeat-ms.
+constexpr std::int64_t kHeartbeatPeriodMs = 100;
+std::int64_t heartbeat_period_ns = kHeartbeatPeriodMs * 1000000LL;
+std::int64_t last_hb_ns = 0;
+
+void heartbeat_if_due() {
+  const std::int64_t now = pf::now_ns();
+  if (now - last_hb_ns >= heartbeat_period_ns / 2) {
+    last_hb_ns = now;
+    pf::watchdog_heartbeat();
+  }
+}
+
+std::string status_text(std::int64_t period_ns, size_t lib_entries, const std::string& library_file) {
   std::lock_guard<std::mutex> g(S.mu);
   std::ostringstream o;
   o << "relmw supervisor on " << platform_name() << "\n"
@@ -75,7 +92,8 @@ std::string status_text(std::int64_t period_ns, size_t lib_entries) {
     << " max=" << us(S.lat.max()) << " deadline_misses=" << S.lat.deadline_misses() << "\n"
     << "compute_per_tick_us p50=" << us(S.compute.quantile(0.5)) << " p99=" << us(S.compute.quantile(0.99))
     << " max=" << us(S.compute.max()) << "\n"
-    << "failure_library_entries=" << lib_entries << "\n";
+    << "failure_library_entries=" << lib_entries << "\n"
+    << "failure_library_file=" << (library_file.empty() ? "-" : library_file) << "\n";
   return o.str();
 }
 
@@ -118,7 +136,7 @@ std::string handle_command(const std::string& line) {
 // Robot adapter that paces every tick on the real-time timer and measures release latency + compute time.
 class RealtimeRobot : public RobotAdapter {
  public:
-  RealtimeRobot(pf::PeriodicTimer& t, bool ham) : timer_(t), ham_(ham) {}
+  explicit RealtimeRobot(pf::PeriodicTimer& t) : timer_(t) {}
   PushSim2D* sim = nullptr;
   Obs get_obs() override { return sim->get_obs(); }
   Vec2 robot_pose() override { return sim->robot_pose(); }
@@ -136,20 +154,18 @@ class RealtimeRobot : public RobotAdapter {
       ++S.ticks;
       if (S.knock) { S.knock = false; sim->knock(0, Vec2{0.0, -0.10}); push_event("CTL knock: cube A displaced 10 cm"); }
     }
-    if (ham_ && (++beats_ % 50 == 0)) pf::watchdog_heartbeat();
+    heartbeat_if_due();
     return sim->step(target);
   }
  private:
   pf::PeriodicTimer& timer_;
-  bool ham_;
   std::int64_t last_wake_ = 0;
-  long beats_ = 0;
 };
 
 }  // namespace
 
 int main(int argc, char** argv) {
-  int episodes = 20, prio = 40;
+  int episodes = 20, prio = 40, heartbeat_ms = kHeartbeatPeriodMs;
   std::int64_t period_ns = 2000000;
   std::string sched = "fifo", report, library;
   bool ham = false;
@@ -171,8 +187,10 @@ int main(int argc, char** argv) {
     else if (a == "--library") library = next();
     else if (a == "--report") report = next();
     else if (a == "--ham") ham = true;
+    else if (a == "--heartbeat-ms") heartbeat_ms = std::atoi(next().c_str());
     else { std::fprintf(stderr, "see header of apps/relmw_supervisor.cpp for usage\n"); return 2; }
   }
+  heartbeat_period_ns = heartbeat_ms * 1000000LL;
   pf::log_init("relmw");
   pf::log(pf::Level::Info, "relmw_supervisor start: platform=%s period_us=%lld sched=%s prio=%d episodes=%d",
           platform_name(), (long long)(period_ns / 1000), sched.c_str(), prio, episodes);
@@ -184,12 +202,13 @@ int main(int argc, char** argv) {
   }
   NaiveRetry naive;
 
-  pf::ControlSurface ctl(mount, {[&] { return status_text(period_ns, lib.lib.size()); }, events_text, handle_command});
+  pf::ControlSurface ctl(mount, {[&] { return status_text(period_ns, lib.lib.size(), library); }, events_text, handle_command});
   std::string err;
   if (!ctl.start(&err)) pf::log(pf::Level::Warn, "control surface unavailable: %s", err.c_str());
 
   if (ham) {
-    if (pf::watchdog_attach("relmw_supervisor", 100000000LL, 3, 10, &err)) pf::log(pf::Level::Info, "HAM heartbeat attached (100 ms)");
+    if (pf::watchdog_attach("relmw_supervisor", heartbeat_period_ns, 3, 10, &err))
+      pf::log(pf::Level::Info, "HAM heartbeat attached (%lld ms)", (long long)(heartbeat_period_ns / 1000000));
     else pf::log(pf::Level::Warn, "HAM attach failed: %s", err.c_str());
   }
   std::int64_t budget = period_ns / 2;
@@ -198,11 +217,11 @@ int main(int argc, char** argv) {
 
   pf::PeriodicTimer timer(period_ns);
   S.lat.set_deadline(period_ns / 2);    // a release later than half a period counts as a deadline miss
-  RealtimeRobot robot(timer, ham);
+  RealtimeRobot robot(timer);
   ExperimentConfig ecfg;
 
   for (int n = 0; (episodes <= 0 || n < episodes) && !S.quit; ++n) {
-    while (true) { { std::lock_guard<std::mutex> g(S.mu); if (!S.paused || S.quit) break; } timer.wait_tick(); ctl.publish(); }
+    while (true) { { std::lock_guard<std::mutex> g(S.mu); if (!S.paused || S.quit) break; } timer.wait_tick(); ctl.publish(); heartbeat_if_due(); }
     int ep = 1000 + n;
     SimConfig sc;
     std::string arm;
@@ -248,9 +267,15 @@ int main(int argc, char** argv) {
     }
     pf::log(pf::Level::Info, "episode %d fault=%s arm=%s -> %s (failures=%d, ticks=%ld)", ep, to_string(sim.fault()), arm.c_str(),
             gt ? "SUCCESS" : "FAILED", rep.n_failures(), sim.ticks());
+    if (!library.empty() && arm == "mw") {  // persist the failure library atomically: tmp write + rename
+      const std::string tmp = library + ".tmp";
+      if (!lib.save(tmp)) pf::log(pf::Level::Warn, "failed to save failure library to %s", tmp.c_str());
+      else if (std::rename(tmp.c_str(), library.c_str()) != 0)
+        pf::log(pf::Level::Warn, "failed to install failure library %s: %s", library.c_str(), std::strerror(errno));
+    }
     ctl.publish();
   }
-  std::string st = status_text(period_ns, lib.lib.size());
+  std::string st = status_text(period_ns, lib.lib.size(), library);
   std::printf("%s", st.c_str());
   if (!report.empty()) {
     std::lock_guard<std::mutex> g(S.mu);

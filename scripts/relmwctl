@@ -1,0 +1,113 @@
+#!/bin/sh
+# relmwctl - operator CLI for the relmw supervisor control surface.
+#
+#   relmwctl [-m DIR] status | events [N] | fault <none|bump|percep_bias|slippery|random|nominal>
+#            | arm <mw|naive|none> | knock | pause | resume | reset-stats | quit | watch [SECONDS]
+#
+# DIR defaults to $RELMW_MOUNT, else /dev/relmw if it exists, else /tmp/relmw.
+# POSIX sh only: runs under QNX ksh as well as Linux dash/bash.
+#
+# Exit codes: 0 = reply started with "OK" (or read command succeeded), 1 = command rejected / reply not OK,
+#             2 = usage error.
+
+set -u
+
+usage() {
+  echo "usage: relmwctl [-m DIR] status | events [N] | fault <none|bump|percep_bias|slippery|random|nominal>" >&2
+  echo "                 | arm <mw|naive|none> | knock | pause | resume | reset-stats | quit | watch [SECONDS]" >&2
+}
+
+DIR=${RELMW_MOUNT:-}
+if [ -z "$DIR" ]; then
+  if [ -d /dev/relmw ]; then DIR=/dev/relmw; else DIR=/tmp/relmw; fi
+fi
+
+while [ $# -gt 0 ]; do
+  case $1 in
+    -m)
+      if [ $# -lt 2 ]; then echo "relmwctl: -m needs a directory argument" >&2; usage; exit 2; fi
+      DIR=$2; shift 2;;
+    --) shift; break;;
+    -*) echo "relmwctl: unknown option $1" >&2; usage; exit 2;;
+    *)  break;;
+  esac
+done
+
+cmd=${1:-}
+arg=${2:-}
+
+# Send "<line>" to DIR/ctl and print the reply. POSIX host (FIFO ctl): the reply lands in DIR/reply;
+# wait up to ~2 s for it to change (content or mtime) before printing. QNX resmgr: the reply to the
+# last command is read back with cat DIR/ctl.
+send_cmd() {
+  line=$1
+  if [ -p "$DIR/ctl" ]; then
+    reply=$DIR/reply
+    old=$(cat "$reply" 2>/dev/null)
+    marker=$(mktemp 2>/dev/null) || marker=
+    [ -n "$marker" ] && : > "$marker"
+    if ! printf '%s\n' "$line" > "$DIR/ctl"; then
+      echo "relmwctl: cannot write $DIR/ctl" >&2
+      [ -n "$marker" ] && rm -f "$marker"
+      exit 1
+    fi
+    new=$old
+    i=0
+    while [ $i -lt 20 ]; do
+      new=$(cat "$reply" 2>/dev/null)
+      [ "$new" != "$old" ] && break
+      [ -n "$marker" ] && [ "$reply" -nt "$marker" ] && break
+      sleep 0.1 2>/dev/null || sleep 1
+      i=$((i + 1))
+    done
+    [ -n "$marker" ] && rm -f "$marker"
+    printf '%s\n' "$new"
+    case $new in
+      OK*) return 0;;
+      *)   return 1;;
+    esac
+  else
+    if ! printf '%s\n' "$line" > "$DIR/ctl"; then
+      echo "relmwctl: cannot write $DIR/ctl" >&2
+      exit 1
+    fi
+    out=$(cat "$DIR/ctl" 2>/dev/null)
+    printf '%s\n' "$out"
+    case $out in
+      OK*) return 0;;
+      *)   return 1;;
+    esac
+  fi
+}
+
+case $cmd in
+  status)
+    cat "$DIR/status"
+    exit $?;;
+  events)
+    if [ $# -gt 2 ]; then usage; exit 2; fi
+    n=${arg:-20}
+    case $n in
+      ''|*[!0-9]*) echo "relmwctl: events: N must be a number" >&2; usage; exit 2;;
+    esac
+    tail -n "$n" "$DIR/events"
+    exit $?;;
+  watch)
+    secs=${arg:-1}
+    case $secs in
+      ''|*[!0-9]*) echo "relmwctl: watch: SECONDS must be a number" >&2; usage; exit 2;;
+    esac
+    while :; do
+      cat "$DIR/status"
+      sleep "$secs"
+    done;;
+  fault|arm)
+    [ -n "$arg" ] || { usage; exit 2; }
+    send_cmd "$cmd $arg"; exit $?;;
+  knock|pause|resume|reset-stats|quit)
+    send_cmd "$cmd"; exit $?;;
+  '')
+    usage; exit 2;;
+  *)
+    echo "relmwctl: unknown command $cmd" >&2; usage; exit 2;;
+esac

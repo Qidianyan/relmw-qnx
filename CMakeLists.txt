@@ -80,3 +80,7 @@ foreach(t test_rng test_stats test_sim2d test_middleware test_retry_policy test_
     add_test(NAME ${t} COMMAND ${t})
   endif()
 endforeach()
+
+if(NOT RELMW_QNX)
+  add_test(NAME test_supervisor_e2e COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_supervisor_e2e.sh $<TARGET_FILE:relmw_supervisor> ${CMAKE_CURRENT_SOURCE_DIR}/scripts/relmwctl)
+endif()
