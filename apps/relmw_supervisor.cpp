@@ -15,7 +15,7 @@
 //
 //   relmw_supervisor [--episodes N] [--period-us 2000] [--arm mw|naive|none] [--nominal] [--prio 40]
 //                    [--sched fifo|sporadic|other] [--mount DIR] [--library FILE] [--report FILE] [--ham]
-//                    [--heartbeat-ms N] [--robot PATH]
+//                    [--heartbeat-ms N] [--robot PATH] [--cpu N | --cluster NAME] [--plan push_A,push_B]
 #include "relmw/experiment.hpp"
 #include "relmw/latency.hpp"
 #include "relmw/platform.hpp"
@@ -56,6 +56,11 @@ struct Shared {
   std::string robot_desc = "in-process";    // "in-process" or the --robot PATH
   int force_fault = -2;               // -2 = random field faults, -1 = nominal, >=0 forced
   bool paused = false, knock = false;
+  std::string cluster = "-";          // CPU cluster of the CONTROL thread; "-" = default affinity
+  std::string affinity = "?";         // thread_affinity_text() sampled ON the control thread (status is served by
+                                      // the control-surface thread, whose own affinity is not the one we report)
+  std::string plan;                   // planned subtask order (CSV); empty = built-in order (default)
+  std::vector<Subtask> task_proto;    // pristine built-in task; its names validate a plan (dry apply_plan)
   std::atomic<bool> quit{false};
   std::atomic<size_t> lib_entries{0};   // read by the resmgr thread; the map itself is only touched by the control thread
 };
@@ -98,6 +103,7 @@ std::string status_text(std::int64_t period_ns, size_t lib_entries, const std::s
   o << "relmw supervisor on " << platform_name() << "\n"
     << "arm=" << S.arm << " paused=" << (S.paused ? "yes" : "no") << "\n"
     << "robot=" << S.robot_desc << "\n"
+    << "plan=" << (S.plan.empty() ? "default" : S.plan) << "\n"
     << "episodes=" << S.episodes << " success=" << S.success << " recovered=" << S.recovered
     << " failures_detected=" << S.failures_detected << " escalated=" << S.escalated << "\n"
     << "robot_link_errors=" << S.robot_link_errors << "\n"
@@ -108,6 +114,7 @@ std::string status_text(std::int64_t period_ns, size_t lib_entries, const std::s
     << " max=" << us(S.lat.max()) << " deadline_misses=" << S.lat.deadline_misses() << "\n"
     << "compute_per_tick_us p50=" << us(S.compute.quantile(0.5)) << " p99=" << us(S.compute.quantile(0.99))
     << " max=" << us(S.compute.max()) << "\n"
+    << "control_affinity=" << S.cluster << " " << S.affinity << "\n"
     << "failure_library_entries=" << lib_entries << "\n"
     << "failure_library_file=" << (library_file.empty() ? "-" : library_file) << "\n";
   return o.str();
@@ -141,12 +148,23 @@ std::string handle_command(const std::string& line) {
     S.arm = arg; push_event("CTL arm " + arg + " (from next episode)");
     return "OK arm " + arg;
   }
+  if (cmd == "plan") {
+    if (arg == "default") { S.plan.clear(); push_event("CTL plan default (from next episode)"); return "OK plan default"; }
+    std::vector<std::string> items;
+    std::string e;
+    if (!parse_plan(arg, items, &e)) return "ERR plan: " + e;
+    std::vector<Subtask> dry = S.task_proto;         // dry run against make_task's names
+    if (!apply_plan(dry, items, &e)) return "ERR plan: " + e;
+    S.plan = arg;
+    push_event("CTL plan " + arg + " (from next episode)");
+    return "OK plan " + arg;
+  }
   if (cmd == "knock") { S.knock = true; return "OK knock"; }
   if (cmd == "pause") { S.paused = true; return "OK pause"; }
   if (cmd == "resume") { S.paused = false; return "OK resume"; }
   if (cmd == "reset-stats") { S.lat.reset(); S.compute.reset(); return "OK reset-stats"; }
   if (cmd == "quit") { S.quit = true; return "OK quit"; }
-  return "ERR commands: fault <x> | arm <mw|naive|none> | knock | pause | resume | reset-stats | quit";
+  return "ERR commands: fault <x> | arm <mw|naive|none> | plan <csv> | knock | pause | resume | reset-stats | quit";
 }
 
 // Real-time robot adapter: wraps any RobotAdapter (the in-process PushSim2D or a RemoteRobot over the
@@ -195,7 +213,7 @@ class RealtimeRobot : public RobotAdapter {
 int main(int argc, char** argv) {
   int episodes = 20, prio = 40, heartbeat_ms = kHeartbeatPeriodMs;
   std::int64_t period_ns = 2000000;
-  std::string sched = "fifo", report, library, robot_path;
+  std::string sched = "fifo", report, library, robot_path, cluster, plan_flag;
   bool ham = false;
 #ifdef __QNX__
   std::string mount = "/dev/relmw";
@@ -217,6 +235,9 @@ int main(int argc, char** argv) {
     else if (a == "--ham") ham = true;
     else if (a == "--heartbeat-ms") heartbeat_ms = std::atoi(next().c_str());
     else if (a == "--robot") robot_path = next();
+    else if (a == "--cpu") cluster = "_cpu-" + next();   // validated strictly by set_thread_cluster
+    else if (a == "--cluster") cluster = next();
+    else if (a == "--plan") plan_flag = next();
     else { std::fprintf(stderr, "see header of apps/relmw_supervisor.cpp for usage\n"); return 2; }
   }
   const bool robot_mode = !robot_path.empty();
@@ -234,6 +255,12 @@ int main(int argc, char** argv) {
   S.lib_entries = lib.lib.size();
   NaiveRetry naive;
 
+  // The pristine built-in task; a plan is validated against make_task's names (dry apply_plan on a copy).
+  {
+    PushSim2D proto(0, SimConfig{});
+    S.task_proto = make_task(proto, 0);
+  }
+
   pf::ControlSurface ctl(mount, {[&] { return status_text(period_ns, S.lib_entries.load(), library); }, events_text, handle_command});
   std::string err;
   if (!ctl.start(&err)) pf::log(pf::Level::Warn, "control surface unavailable: %s", err.c_str());
@@ -246,6 +273,24 @@ int main(int argc, char** argv) {
   std::int64_t budget = period_ns / 2;
   if (!pf::set_thread_sched(sched, prio, 10, budget, period_ns, &err))
     pf::log(pf::Level::Warn, "set_thread_sched(%s,%d) failed: %s (continuing at default priority)", sched.c_str(), prio, err.c_str());
+
+  // Pin the CONTROL thread only (the control-surface service thread was created earlier and stays on the default
+  // affinity). Warn and continue on failure.
+  if (!cluster.empty()) {
+    std::string ce;
+    if (pf::set_thread_cluster(cluster, &ce)) S.cluster = cluster;
+    else pf::log(pf::Level::Warn, "set_thread_cluster(%s) failed: %s (continuing on default affinity)",
+                 cluster.c_str(), ce.c_str());
+  }
+  { std::lock_guard<std::mutex> g(S.mu); S.affinity = pf::thread_affinity_text(); }
+  if (!plan_flag.empty()) {
+    std::vector<std::string> items;
+    std::string pe;
+    std::vector<Subtask> dry = S.task_proto;
+    if (!parse_plan(plan_flag, items, &pe) || !apply_plan(dry, items, &pe))
+      pf::log(pf::Level::Warn, "--plan %s rejected: %s (using the built-in order)", plan_flag.c_str(), pe.c_str());
+    else S.plan = plan_flag;
+  }
 
   pf::PeriodicTimer timer(period_ns);
   S.lat.set_deadline(period_ns / 2);    // a release later than half a period counts as a deadline miss
@@ -356,9 +401,25 @@ int main(int argc, char** argv) {
           push_event(line);
         });
         auto task = make_task(*truth, ep);
+        {
+          std::lock_guard<std::mutex> g(S.mu);
+          if (!S.plan.empty()) {   // default plan: apply_plan is not called, behavior stays identical
+            std::vector<std::string> items;
+            std::string pe;
+            if (!parse_plan(S.plan, items, &pe) || !apply_plan(task, items, &pe))
+              pf::log(pf::Level::Warn, "plan \"%s\" no longer valid: %s (using the built-in order)",
+                      S.plan.c_str(), pe.c_str());
+          }
+        }
         rep = mw.run(task);
         gt = true;
-        for (int i = 0; i < kNumObjects; ++i) gt = gt && oracle_verdict(truth->truth(), i).ok;
+        // Ground truth scores only the planned objects: the middleware's FINAL CHECK re-verifies exactly the
+        // subtasks in the (possibly filtered) task vector, so the end-of-episode score must match the plan.
+        for (int i = 0; i < kNumObjects; ++i) {
+          bool wanted = false;
+          for (auto& st : task) if (st.name == std::string("push_") + object_name(i)) wanted = true;
+          if (wanted) gt = gt && oracle_verdict(truth->truth(), i).ok;
+        }
         sim_ticks = robot.robot_ticks();
         done = true;
       } catch (const RobotLinkError& e) {
@@ -401,7 +462,8 @@ int main(int argc, char** argv) {
     std::lock_guard<std::mutex> g(S.mu);
     std::ofstream f(report);
     f << "{\"platform\":\"" << platform_name() << "\",\"arm\":\"" << S.arm << "\",\"period_ns\":" << period_ns
-      << ",\"sched\":\"" << sched << "\",\"priority\":" << prio << ",\"episodes\":" << S.episodes << ",\"success\":" << S.success
+      << ",\"sched\":\"" << sched << "\",\"priority\":" << prio << ",\"cluster\":\"" << S.cluster
+      << "\",\"episodes\":" << S.episodes << ",\"success\":" << S.success
       << ",\"recovered\":" << S.recovered << ",\"escalated\":" << S.escalated << ",\"ticks\":" << S.ticks
       << ",\"release_latency\":" << S.lat.to_json() << ",\"compute_per_tick\":" << S.compute.to_json() << "}\n";
   }

@@ -14,7 +14,12 @@ The LLM never runs inside the control loop. It runs on the development host,
 produces a small validated artefact (a plan line or an explanation text), and
 the plan reaches the supervisor through its normal control surface
 (`plan push_B,push_A` written to `/dev/relmw/ctl` on QNX, `<dir>/ctl` FIFO on
-the Linux host) via `scripts/relmwctl`. Every LLM output is validated against a
+the Linux host) via `scripts/relmwctl`. The supervisor side of the command is
+implemented: `relmwctl plan push_B,push_A` replies exactly
+`OK plan push_B,push_A`, the new order takes effect from the NEXT episode
+(`plan default` restores the built-in order; the status line shows
+`plan=<csv or default>`), and every invalid plan is rejected with
+`ERR plan: <reason>` (exit 1). Every LLM output is validated against a
 closed vocabulary; anything invalid falls back to a deterministic rule-based
 result. With no endpoint configured the tool still works (fallback only) and
 says so on stderr.

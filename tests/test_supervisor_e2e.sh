@@ -47,7 +47,7 @@ wait_exit() {
 }
 
 start_supervisor() {
-  "$SUP" --episodes 0 --period-us 300 --sched other --mount "$D/mnt" --library "$D/lib.txt" >>"$LOG" 2>&1 &
+  "$SUP" --episodes 0 --period-us 300 --sched other --mount "$D/mnt" --library "$D/lib.txt" --cpu 0 >>"$LOG" 2>&1 &
   PID=$!
 }
 
@@ -63,6 +63,17 @@ while [ ! -f "$D/mnt/status" ] && [ $i -lt 100 ]; do
   i=$((i + 1))
 done
 [ -f "$D/mnt/status" ] || fail "status node did not appear within 10 s"
+
+# 1b) --cpu 0 pins the CONTROL thread (the control-surface service thread was created earlier and keeps the default
+# affinity); the status line must report it.
+i=0
+while [ $i -lt 50 ]; do
+  grep -q '^control_affinity=_cpu-0 ' "$D/mnt/status" 2>/dev/null && break
+  kill -0 "$PID" 2>/dev/null || fail "supervisor exited before publishing control_affinity"
+  sleep 0.1
+  i=$((i + 1))
+done
+grep -q '^control_affinity=_cpu-0 cpus=0 mask=0x1$' "$D/mnt/status" || fail "status has no 'control_affinity=_cpu-0 cpus=0 mask=0x1' line (affinity must be the CONTROL thread's)"
 
 # 2) valid and invalid fault commands through relmwctl
 "$CTL" -m "$D/mnt" fault percep_bias >/dev/null 2>&1
@@ -106,6 +117,34 @@ while [ $i -lt 100 ]; do
   i=$((i + 1))
 done
 [ "${ents:-0}" -gt 0 ] || fail "failure_library_entries not > 0 within 10 s after restart (entries=$ents)"
+
+# 5b) plan command: reorder takes effect from the NEXT episode; invalid plans are rejected
+rep=$("$CTL" -m "$D/mnt" plan push_B,push_A)
+[ $? -eq 0 ] || fail "relmwctl plan push_B,push_A did not exit 0"
+case "$rep" in
+  "OK plan push_B,push_A") ;;
+  *) fail "unexpected plan reply: $rep" ;;
+esac
+"$CTL" -m "$D/mnt" plan push_C >/dev/null 2>&1
+[ $? -eq 1 ] || fail "relmwctl plan push_C did not exit 1"
+i=0
+plan_seen=0
+while [ $i -lt 80 ]; do
+  ev=$("$CTL" -m "$D/mnt" events 50 2>/dev/null)
+  if printf '%s\n' "$ev" | grep -q 'SUBTASK_START push_B' && \
+     printf '%s\n' "$ev" | awk '
+        /SUBTASK_START push_B/ { b = $1 }
+        /SUBTASK_START push_A/ { if (b != "" && b == $1) { print "ok"; exit 0 } }
+      ' | grep -q ok; then
+    plan_seen=1
+    break
+  fi
+  kill -0 "$PID" 2>/dev/null || fail "supervisor died while waiting for the planned episode"
+  sleep 0.2
+  i=$((i + 1))
+done
+[ $plan_seen -eq 1 ] || fail "no episode ran SUBTASK_START push_B before SUBTASK_START push_A under plan push_B,push_A"
+grep -q '^plan=push_B,push_A$' "$D/mnt/status" || fail "status has no 'plan=push_B,push_A' line"
 
 "$CTL" -m "$D/mnt" quit >/dev/null 2>&1
 [ $? -eq 0 ] || fail "relmwctl quit (after restart) did not exit 0"

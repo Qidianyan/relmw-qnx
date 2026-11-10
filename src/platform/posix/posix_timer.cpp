@@ -6,17 +6,25 @@
 //    absorbed by re-anchoring to the next future-or-current period boundary (no catch-up burst).
 //  * set_thread_sched(): SCHED_FIFO / SCHED_RR / SCHED_OTHER through pthread_setschedparam.
 //    SCHED_SPORADIC is a QNX extension and is rejected on this OS.
+//  * set_thread_cluster(): CPU affinity of the calling thread, by the QNX cluster vocabulary. "_all" restores the
+//    process's initial allowed mask (captured once; inside a container that is a subset of the machine's CPUs),
+//    "_cpu-N" pins to one CPU that must be both configured and allowed by the process mask.
 //  * watchdog_*(): no-ops (systemd or a shell loop plays the HAM role on the host).
 #define _POSIX_C_SOURCE 200809L
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE  // pthread_setaffinity_np / pthread_getaffinity_np / CPU_*
+#endif
 #include "relmw/platform.hpp"
 
 #include <atomic>
 #include <cerrno>
+#include <cstdio>
 #include <cstring>
 #include <pthread.h>
 #include <sched.h>
 #include <string>
 #include <time.h>
+#include <unistd.h>
 
 namespace relmw::platform {
 
@@ -95,6 +103,83 @@ bool set_thread_sched(const std::string& policy, int priority, int low_priority,
     return false;
   }
   return true;
+}
+
+// ---- CPU affinity (clusters) -------------------------------------------------------------
+namespace {
+
+// The process's initial allowed mask, captured once on first use (sched_getaffinity of pid 0): inside a container
+// this can be a strict subset of the machine's CPUs, and "_all" restores exactly this mask.
+const cpu_set_t& allowed_mask() {
+  static cpu_set_t m;
+  static bool once = false;
+  if (!once) {
+    CPU_ZERO(&m);
+    if (sched_getaffinity(0, sizeof m, &m) != 0) CPU_ZERO(&m);  // empty on error: everything but _all fails
+    once = true;
+  }
+  return m;
+}
+
+}  // namespace
+
+bool set_thread_cluster(const std::string& name, std::string* err) {
+  auto fail = [&](const std::string& why) {
+    if (err) *err = "EINVAL " + why;
+    return false;
+  };
+  if (name == "_all") {
+    const cpu_set_t& m = allowed_mask();
+    if (pthread_setaffinity_np(pthread_self(), sizeof m, &m) != 0) return fail("cannot restore the initial mask");
+    return true;
+  }
+  const std::string pre = "_cpu-";
+  if (name.size() <= pre.size() || name.compare(0, pre.size(), pre) != 0)
+    return fail("cluster name must be \"_all\" or \"_cpu-N\" (custom clusters exist only on QNX, "
+                "defined by the startup program -c)");
+  const std::string digits = name.substr(pre.size());
+  for (char c : digits)
+    if (c < '0' || c > '9')
+      return fail("cluster name \"" + name + "\": N must be decimal digits only "
+                  "(custom clusters exist only on QNX)");
+  long n = 0;
+  for (char c : digits) {
+    n = n * 10 + (c - '0');
+    if (n > 1024) return fail("cpu index out of range in cluster name \"" + name + "\"");
+  }
+  const long nconf = sysconf(_SC_NPROCESSORS_CONF);
+  if (nconf < 0 || n >= nconf)
+    return fail("cpu " + std::to_string(n) + " >= configured CPUs (" + std::to_string(nconf < 0 ? 0 : nconf) + ")");
+  const cpu_set_t& m = allowed_mask();
+  if (!CPU_ISSET((int)n, &m))
+    return fail("cpu " + std::to_string(n) + " is not allowed by the process affinity mask");
+  cpu_set_t one;
+  CPU_ZERO(&one);
+  CPU_SET((int)n, &one);
+  if (pthread_setaffinity_np(pthread_self(), sizeof one, &one) != 0)
+    return fail("pthread_setaffinity_np(cpu " + std::to_string(n) + ") failed");
+  return true;
+}
+
+// "cpus=<comma list of CPU ids> mask=0x<hex>", the same format as the QNX implementation (qnx_timer.cpp).
+std::string thread_affinity_text() {
+  cpu_set_t s;
+  CPU_ZERO(&s);
+  const int rc = pthread_getaffinity_np(pthread_self(), sizeof s, &s);
+  if (rc != 0) return std::string("cpus=? mask=? (pthread_getaffinity_np: ") + strerror(rc) + ")";
+  std::string cpus;
+  for (int cpu = 0; cpu < CPU_SETSIZE; ++cpu)
+    if (CPU_ISSET(cpu, &s)) { if (!cpus.empty()) cpus += ','; cpus += std::to_string(cpu); }
+  std::string hex;  // whole runmask, most significant nibble first, leading zeros trimmed
+  for (int nib = (CPU_SETSIZE + 3) / 4 - 1; nib >= 0; --nib) {
+    int v = 0;
+    for (int b = 0; b < 4; ++b) {
+      const int cpu = nib * 4 + b;
+      if (cpu < CPU_SETSIZE && CPU_ISSET(cpu, &s)) v |= 1 << b;
+    }
+    if (!hex.empty() || v != 0 || nib == 0) hex += (char)("0123456789abcdef"[v]);
+  }
+  return "cpus=" + (cpus.empty() ? std::string("-") : cpus) + " mask=0x" + hex;
 }
 
 bool watchdog_attach(const char*, std::int64_t, int, int, std::string*) { return true; }

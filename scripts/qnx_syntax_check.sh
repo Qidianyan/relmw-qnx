@@ -42,5 +42,7 @@ neg "io_funcs.msg with a devctl-style handler" '#include <sys/iofunc.h>
 int h(resmgr_context_t*, io_read_t*, iofunc_ocb_t*); void f(resmgr_io_funcs_t* io){ io->msg = h; }'
 neg "pthread_cluster_set() without tid" '#include <pthread.h>
 int f(){ return pthread_cluster_set("_cpu-0"); }'
+neg "pthread_cluster_get_runmask() with unsigned*" '#include <pthread.h>
+int f(unsigned* m){ return pthread_cluster_get_runmask("_all", m); }'
 [ $rc -eq 0 ] && echo "qnx_syntax_check: all QNX translation units pass -fsyntax-only against 8.0 stubs"
 exit $rc

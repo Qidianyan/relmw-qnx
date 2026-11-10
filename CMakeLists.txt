@@ -82,7 +82,7 @@ install(TARGETS relmw_bench relmw_supervisor DESTINATION bin)
 
 # ---- tests (ctest) ----------------------------------------------------------
 enable_testing()
-foreach(t test_rng test_stats test_sim2d test_middleware test_retry_policy test_latency test_posix_platform test_experiment test_rt_noalloc test_robot_link)
+foreach(t test_rng test_stats test_sim2d test_middleware test_retry_policy test_latency test_posix_platform test_experiment test_rt_noalloc test_robot_link test_plan test_affinity)
   if(RELMW_QNX AND t STREQUAL "test_posix_platform")
     continue()   # exercises the POSIX control surface (FIFO files); the QNX layer is covered by scripts/target/relmw_target_run.sh
   endif()
