@@ -49,7 +49,7 @@ struct Rec {
 }  // namespace
 
 TEST(always_ok_single_pass) {
-  FakeRobot r; FakePolicy p; Script s; s.attempt = -1; s.ok_from = 0; Rec rec; rec.scripts = {&s};
+  FakeRobot r; FakePolicy p; Script s; s.attempt = -1; s.ok_from = 0; Rec rec; rec.scripts.push_back(&s);
   MiddlewareConfig c; c.max_retries = 3;
   ReliabilityMiddleware mw(p, r, nullptr, c, rec.sink());
   std::vector<Subtask> t{make("s1", &s)};
@@ -62,7 +62,7 @@ TEST(always_ok_single_pass) {
 }
 
 TEST(recovers_after_two_failures) {
-  FakeRobot r; FakePolicy p; Script s; s.ok_from = 2; Rec rec; rec.scripts = {&s};
+  FakeRobot r; FakePolicy p; Script s; s.ok_from = 2; Rec rec; rec.scripts.push_back(&s);
   MiddlewareConfig c; c.max_retries = 3; c.final_check = false;
   ReliabilityMiddleware mw(p, r, nullptr, c, rec.sink());
   std::vector<Subtask> t{make("s1", &s)};
@@ -80,7 +80,7 @@ TEST(recovers_after_two_failures) {
 }
 
 TEST(retry_budget_exhausted) {
-  FakeRobot r; FakePolicy p; Script s; s.ok_from = 99; Rec rec; rec.scripts = {&s};
+  FakeRobot r; FakePolicy p; Script s; s.ok_from = 99; Rec rec; rec.scripts.push_back(&s);
   MiddlewareConfig c; c.max_retries = 3;
   ReliabilityMiddleware mw(p, r, nullptr, c, rec.sink());
   std::vector<Subtask> t{make("s1", &s)};
@@ -93,7 +93,7 @@ TEST(retry_budget_exhausted) {
 }
 
 TEST(disabled_middleware_single_attempt) {
-  FakeRobot r; FakePolicy p; Script s; s.ok_from = 99; Rec rec; rec.scripts = {&s};
+  FakeRobot r; FakePolicy p; Script s; s.ok_from = 99; Rec rec; rec.scripts.push_back(&s);
   MiddlewareConfig c; c.max_retries = 0;
   ReliabilityMiddleware mw(p, r, nullptr, c, rec.sink());
   std::vector<Subtask> t{make("s1", &s)};
@@ -104,7 +104,7 @@ TEST(disabled_middleware_single_attempt) {
 }
 
 TEST(unrecoverable_aborts_immediately) {
-  FakeRobot r; FakePolicy p; Script s; s.ok_from = 99; s.mode = FailureMode::Unrecoverable; Rec rec; rec.scripts = {&s};
+  FakeRobot r; FakePolicy p; Script s; s.ok_from = 99; s.mode = FailureMode::Unrecoverable; Rec rec; rec.scripts.push_back(&s);
   MiddlewareConfig c; c.max_retries = 3;
   ReliabilityMiddleware mw(p, r, nullptr, c, rec.sink());
   std::vector<Subtask> t{make("s1", &s)};
@@ -114,7 +114,7 @@ TEST(unrecoverable_aborts_immediately) {
 }
 
 TEST(time_budget) {
-  FakeRobot r; FakePolicy p; Script s; s.ok_from = 99; Rec rec; rec.scripts = {&s};
+  FakeRobot r; FakePolicy p; Script s; s.ok_from = 99; Rec rec; rec.scripts.push_back(&s);
   MiddlewareConfig c; c.max_retries = 3; c.episode_step_budget = 10;
   ReliabilityMiddleware mw(p, r, nullptr, c, rec.sink());
   std::vector<Subtask> t{make("s1", &s, 200)};
@@ -124,7 +124,7 @@ TEST(time_budget) {
 }
 
 TEST(corr_aware_escalates_when_ladder_exhausted) {
-  FakeRobot r; FakePolicy p; Script s; s.ok_from = 99; Rec rec; rec.scripts = {&s};
+  FakeRobot r; FakePolicy p; Script s; s.ok_from = 99; Rec rec; rec.scripts.push_back(&s);
   CorrelationAwareRetry lib;
   MiddlewareConfig c; c.max_retries = 10;
   ReliabilityMiddleware mw(p, r, &lib, c, rec.sink());
@@ -141,7 +141,7 @@ TEST(corr_aware_escalates_when_ladder_exhausted) {
 }
 
 TEST(corr_aware_with_three_retries_is_retry_budget) {
-  FakeRobot r; FakePolicy p; Script s; s.ok_from = 99; Rec rec; rec.scripts = {&s};
+  FakeRobot r; FakePolicy p; Script s; s.ok_from = 99; Rec rec; rec.scripts.push_back(&s);
   CorrelationAwareRetry lib;
   MiddlewareConfig c; c.max_retries = 3;
   ReliabilityMiddleware mw(p, r, &lib, c, rec.sink());
@@ -152,7 +152,7 @@ TEST(corr_aware_with_three_retries_is_retry_budget) {
 }
 
 TEST(final_check_redoes_regressed_subtask) {
-  FakeRobot r; FakePolicy p; Script a; a.ok_from = 0; Script b; b.ok_from = 0; Rec rec; rec.scripts = {&a, &b};
+  FakeRobot r; FakePolicy p; Script a; a.ok_from = 0; Script b; b.ok_from = 0; Rec rec; rec.scripts.push_back(&a); rec.scripts.push_back(&b);
   MiddlewareConfig c; c.max_retries = 3;
   ReliabilityMiddleware mw(p, r, nullptr, c, rec.sink());
   std::vector<Subtask> t{make("s1", &a), make("s2", &b)};
