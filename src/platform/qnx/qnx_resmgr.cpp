@@ -4,6 +4,9 @@
 //   /dev/relmw/ctl     (write) : one-line commands, e.g. `echo "fault percep_bias" > /dev/relmw/ctl`
 // Any process (shell, HMI, a cell controller) talks to the supervisor through plain open/read/write,
 // i.e. QNX native message passing (_IO_READ/_IO_WRITE) handled by this dispatch loop.
+// Checked against QNX SDP 8.0 docs (2026-11-10): resmgr_attach, iofunc_func_init, iofunc_attr_init, dispatch_create,
+// dispatch_context_alloc/block/handler, iofunc_read_verify/write_verify, _IO_READ_GET_NBYTES, resmgr_msgget.
+// Needs PROCMGR_AID_PATHSPACE (root on the mkqnximage target).
 #ifdef __QNX__
 #include "relmw/platform.hpp"
 #include <errno.h>
@@ -67,10 +70,13 @@ static int relmw_io_write(resmgr_context_t* ctp, io_write_t* msg, RESMGR_OCB_T* 
   ControlSurface::Impl* im = g_impl;
   if (ocb->attr != &im->attr_ctl) return EROFS;
   size_t nbytes = _IO_WRITE_GET_NBYTES(msg);
+  // 8.0 sample: reject writes that claim more data than the message carries.
+  if (nbytes > (size_t)ctp->info.srcmsglen - (size_t)ctp->offset - sizeof(io_write_t)) return EBADMSG;
   char buf[512];
-  size_t n = nbytes < sizeof buf - 1 ? nbytes : sizeof buf - 1;
-  if (resmgr_msgget(ctp, buf, n, sizeof(msg->i)) == -1) return errno;
-  buf[n] = '\0';
+  size_t n = nbytes < sizeof buf - 1 ? nbytes : sizeof buf - 1;   // commands are one short line; longer input is truncated
+  ssize_t got = resmgr_msgget(ctp, buf, n, sizeof(msg->i));
+  if (got == -1) return errno;
+  buf[got] = '\0';
   std::string line(buf);
   while (!line.empty() && (line.back() == '\n' || line.back() == '\r' || line.back() == ' ')) line.pop_back();
   if (im->self) im->last_reply = im->self->hooks_command(line) + "\n";
@@ -109,7 +115,9 @@ bool ControlSurface::start(std::string* err) {
   rattr.msg_max_size = 2048;
   iofunc_func_init(_RESMGR_CONNECT_NFUNCS, &impl_->connect_funcs, _RESMGR_IO_NFUNCS, &impl_->io_funcs);
   impl_->io_funcs.read = relmw_io_read;
+  impl_->io_funcs.read64 = relmw_io_read;    // 8.0: _IO_READ64 is routed to read64 (sample in "Writing a Resource Manager")
   impl_->io_funcs.write = relmw_io_write;
+  impl_->io_funcs.write64 = relmw_io_write;  // likewise for _IO_WRITE64
   iofunc_attr_init(&impl_->attr_status, S_IFNAM | 0444, nullptr, nullptr);
   iofunc_attr_init(&impl_->attr_events, S_IFNAM | 0444, nullptr, nullptr);
   iofunc_attr_init(&impl_->attr_ctl, S_IFNAM | 0666, nullptr, nullptr);
