@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // State-machine tests for ReliabilityMiddleware using a fake robot / policy / verifier (no simulator).
 #include "minitest.hpp"
 #include "relmw/middleware.hpp"

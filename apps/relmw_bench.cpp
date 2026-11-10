@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // relmw_bench: paired N-episode benchmark (none / naive retry / middleware). Runs on Linux and QNX.
 //   relmw_bench [--n 100] [--warmup 40] [--bias 0.15] [--out results]
 #include "relmw/experiment.hpp"

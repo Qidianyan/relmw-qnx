@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 elidot
 """Tests for tools/make_dashboard.py (registered in ctest as test_dashboard).
 
 Runs the real generator against the real results/host_linux, writing output

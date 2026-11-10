@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Checklist B9: prove the real-time path does not allocate.
 //
 // This TU replaces the global replaceable allocation functions. Every call is counted in one

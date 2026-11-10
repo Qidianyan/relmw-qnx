@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 elidot
 # Runs ON the QNX 8.0 target (QEMU image built by mkqnximage). Uploaded and started by scripts/qnx_first_run.sh.
 # Everything it produces goes to $OUT (default /data/relmw/out); the host copies that directory back.
 # POSIX sh / QNX ksh only. Processes are stopped by PID only.

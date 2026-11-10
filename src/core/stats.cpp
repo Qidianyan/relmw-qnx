@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Small-sample statistics for the paired reliability benchmark.
 // C++ port of reliability_mw/stats.py (Newcombe 1998 intervals, exact McNemar, bootstrap).
 #include "relmw/stats.hpp"

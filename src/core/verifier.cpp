@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 #include "relmw/verifier.hpp"
 #include <cmath>
 

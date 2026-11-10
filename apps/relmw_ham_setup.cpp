@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // QNX only: register relmw_supervisor with the High Availability Manager so that it is restarted
 // automatically if it dies (CONDDEATH -> restart action). Requires `ham` to be running on the target.
 //   relmw_ham_setup "/usr/bin/relmw_supervisor --episodes 0 --library /data/relmw/failure_library.txt"

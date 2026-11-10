@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // QNX resource manager exposing the reliability supervisor as files under /dev/relmw:
 //   /dev/relmw/status  (read)  : live counters, current subtask, control-loop latency p50/p99/max
 //   /dev/relmw/events  (read)  : last N middleware events (VERIFY_FAIL, ROLLBACK, RETRY, ESCALATE ...)

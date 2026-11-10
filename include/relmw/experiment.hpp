@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Paired benchmark: same policy, same episode seeds, same verifier; three arms.
 //   single_pass      : no retries (verifier only sequences subtasks)   = "no middleware"
 //   naive_retry      : rollback + replay, up to 3 retries per subtask

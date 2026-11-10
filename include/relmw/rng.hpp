@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Deterministic, platform-independent RNG (identical streams on Linux and QNX, any libc).
 #pragma once
 #include <cstdint>

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // relmw_supervisor: the reliability middleware as a real-time supervisor process.
 //
 //  * Control loop thread: SCHED_FIFO (or SCHED_SPORADIC on QNX) priority, paced by a periodic kernel timer

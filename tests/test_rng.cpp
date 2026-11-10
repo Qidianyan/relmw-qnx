@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Unit tests for the portable, platform-independent RNG.
 #include "relmw/rng.hpp"
 #include "minitest.hpp"

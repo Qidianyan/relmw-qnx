@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 elidot
 # Copy the QNX build to the QEMU target and run the demo + benchmark there.
 #   TARGET=root@<ip> scripts/deploy_qemu.sh
 set -euo pipefail

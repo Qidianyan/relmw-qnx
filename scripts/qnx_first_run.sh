@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 elidot
 # First run on QNX 8.0, one command, after the QNX Everywhere license + SDP 8.0 are installed:
 #
 #   QNX_SDP=~/qnx800 scripts/qnx_first_run.sh            # build -> image -> boot QEMU -> run everything -> collect

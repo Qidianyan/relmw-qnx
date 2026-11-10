@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // POSIX (Linux host) timing + scheduling + watchdog stubs.
 //  * PeriodicTimer: absolute-deadline sleeps via clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME);
 //    the first release lands one period after construction; a wake more than one period late is

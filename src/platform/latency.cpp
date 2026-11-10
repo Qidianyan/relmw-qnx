@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Log-linear latency histogram for the real-time control loop (see include/relmw/latency.hpp).
 // record() is O(1) and allocation-free: the histogram vector is sized once in the constructor.
 #include "relmw/latency.hpp"

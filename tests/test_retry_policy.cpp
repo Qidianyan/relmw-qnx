@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Unit tests for the retry policies (naive replay + correlation-aware failure library).
 #include "relmw/retry_policy.hpp"
 #include "relmw/strategies.hpp"

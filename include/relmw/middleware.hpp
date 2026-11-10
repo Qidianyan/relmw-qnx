@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // The reliability middleware state machine (C++ port of reliability_mw/core.py).
 //
 //   for each subtask:  CHECKPOINT -> RUN(policy, verifier every k ticks, settle/hold) -> VERIFY

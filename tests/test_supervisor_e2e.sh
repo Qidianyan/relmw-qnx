@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 elidot
 # test_supervisor_e2e.sh - end-to-end test of the relmw supervisor control surface.
 #
 #   sh tests/test_supervisor_e2e.sh <relmw_supervisor-binary> <relmwctl-script>

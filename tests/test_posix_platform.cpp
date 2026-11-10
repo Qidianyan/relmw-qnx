@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Host-side (POSIX) platform tests: clock, periodic timer, scheduling policy table,
 // FIFO control surface and stderr logging smoke test.
 #include "relmw/platform.hpp"

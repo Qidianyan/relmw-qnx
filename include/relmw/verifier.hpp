@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Subtask verifiers. The middleware only sees Verdicts; ground truth is never used for decisions.
 #pragma once
 #include "relmw/sim2d.hpp"

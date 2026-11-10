@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Deterministic 2-D quasi-static pushing simulator (no GPU, no dynamic allocation in step()).
 // Same task as the MuJoCo Python demo: a disk pusher pushes cube A to goal A and cube B to goal B.
 // Field faults (drawn per episode seed, documented causes):

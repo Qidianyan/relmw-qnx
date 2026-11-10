@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Latency / jitter statistics for the real-time control loop (portable, allocation-free record()).
 #pragma once
 #include <cstdint>

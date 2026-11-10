@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Tests for src/platform/latency.cpp (LatencyStats log-linear histogram).
 #include "minitest.hpp"
 #include "relmw/latency.hpp"

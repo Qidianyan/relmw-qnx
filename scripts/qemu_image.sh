@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 elidot
 # Create (once) and boot a QNX 8.0 x86_64 QEMU target with mkqnximage (QNX SDP 8.0 required).
 #   QNX_SDP=~/qnx800 scripts/qemu_image.sh        # builds ./qnx-vm and runs it (serial console)
 set -euo pipefail

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 elidot
 # Cross-build for QNX SDP 8.0 with qcc/q++. Requires a QNX Everywhere (non-commercial) license + SDP install.
 #   QNX_SDP=~/qnx800 scripts/build_qnx.sh [x86_64|aarch64le]
 set -euo pipefail

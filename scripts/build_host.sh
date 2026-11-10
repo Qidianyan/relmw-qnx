@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 elidot
 # Build + test on a Linux host. Uses $CXX if set, else g++/clang++, else zig-c++.
 set -euo pipefail
 cd "$(dirname "$0")/.."

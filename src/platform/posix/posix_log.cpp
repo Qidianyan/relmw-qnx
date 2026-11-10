@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // POSIX (Linux host) logging: one line per call on stderr, prefixed with the monotonic
 // timestamp in seconds since the first log_init(). A single mutex guards both the name
 // and the timestamp origin, so log_init()/log() are safe to call from any thread.

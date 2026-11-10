@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // slog2 logging (QNX 8.0 discontinued syslogd; slogger2 is the system logger). View with: slog2info -b relmw
 #ifdef __QNX__
 #include "relmw/platform.hpp"

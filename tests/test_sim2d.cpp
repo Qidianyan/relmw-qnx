@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Unit tests for the deterministic 2-D pushing simulator.
 #include "relmw/sim2d.hpp"
 #include "relmw/policy.hpp"

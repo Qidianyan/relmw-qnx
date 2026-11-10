@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // OS layer. Two implementations behind one interface:
 //   src/platform/qnx/   : QNX SDP 8.0 native (ChannelCreate/timer_create pulses/MsgReceivePulse,
 //                         resource manager /dev/relmw, slog2, SCHED_FIFO/SCHED_SPORADIC, HAM heartbeat)

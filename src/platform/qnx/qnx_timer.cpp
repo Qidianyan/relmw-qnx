@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // QNX SDP 8.0 native timing + scheduling + HAM watchdog.
 //  * Periodic tick = kernel timer (timer_create, CLOCK_MONOTONIC) delivering a PULSE to a private channel;
 //    the control thread blocks in MsgReceivePulse() -> no signals, no polling, priority-inherited delivery.

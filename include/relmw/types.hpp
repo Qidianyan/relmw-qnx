@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Basic value types shared by the portable core.
 #pragma once
 #include <cmath>

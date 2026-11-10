@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // End-to-end benchmark tests: determinism and the expected ordering of the three arms.
 #include "minitest.hpp"
 #include "relmw/experiment.hpp"

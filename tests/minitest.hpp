@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Minimal dependency-free test harness (so the test suite also builds with q++ for QNX).
 #pragma once
 #include <cmath>

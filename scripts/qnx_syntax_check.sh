@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 elidot
 # Host-side static check of the QNX-only code before an SDP is available:
 #   g++ -fsyntax-only -D__QNX__ against hand-written QNX 8.0 API stubs (tools/qnx_stubs/include, see its README).
 # Catches wrong argument counts/types, missing includes, typos in QNX identifiers. It does NOT prove the code links or

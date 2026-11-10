@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Scripted pushing policy standing in for a learned policy (ACT / diffusion / VLA).
 #pragma once
 #include "relmw/robot.hpp"

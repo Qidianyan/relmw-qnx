@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Retry policies: NaiveRetry (rollback + replay) and CorrelationAwareRetry (failure library).
 #pragma once
 #include "relmw/strategies.hpp"

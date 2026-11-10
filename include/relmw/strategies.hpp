@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Recovery strategies. All are policy-agnostic: they act only through the robot adapter (motion
 // primitives / speed override), the observation stream, or the action stream. Never policy internals.
 #pragma once

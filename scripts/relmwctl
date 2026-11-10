@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 elidot
 # relmwctl - operator CLI for the relmw supervisor control surface.
 #
 #   relmwctl [-m DIR] status | events [N] | fault <none|bump|percep_bias|slippery|random|nominal>

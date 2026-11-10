@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 #include "relmw/policy.hpp"
 #include "relmw/rng.hpp"
 #include <algorithm>

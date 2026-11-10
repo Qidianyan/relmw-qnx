@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // The only things the middleware needs from a robot / policy / verifier.
 #pragma once
 #include "relmw/types.hpp"

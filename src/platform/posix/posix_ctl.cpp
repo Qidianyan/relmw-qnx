@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // POSIX (Linux host) control surface: a file-based emulation of the QNX resource manager.
 //   <dir>/status, <dir>/events : rewritten atomically (temp file + rename) by publish()
 //   <dir>/ctl                  : named FIFO; one service thread reads lines, answers each

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
 // Tests for src/core/stats.cpp (port of reliability_mw/stats.py).
 #include "minitest.hpp"
 #include "relmw/stats.hpp"
