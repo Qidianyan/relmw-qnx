@@ -1,0 +1,7 @@
+push_A|off_axis_drift|reapproach_left 1 4
+push_A|off_axis_drift|reapproach_right 0 2
+push_A|off_axis_drift|relocalize 1 1
+push_A|off_axis_drift|replay 0 1
+push_A|wrong_side_stall|relocalize 1 1
+push_A|wrong_side_stall|replay 0 1
+push_B|off_axis_drift|reapproach_left 1 1
