@@ -24,6 +24,8 @@ struct _io_read { uint16_t type; uint16_t combine_len; uint32_t nbytes; uint32_t
 typedef union { struct _io_read i; } io_read_t;
 struct _io_write { uint16_t type; uint16_t combine_len; uint32_t nbytes; uint32_t xtype; uint32_t zero; };
 typedef union { struct _io_write i; } io_write_t;
+#define _IO_FLAG_RD 0x00000001
+#define _IO_FLAG_WR 0x00000002
 #define _IO_XTYPE_MASK 0x000000ffu
 #define _IO_XTYPE_NONE 0x00000000u
 #define _IO_READ_GET_NBYTES(msg) ((size_t)(msg)->i.nbytes)

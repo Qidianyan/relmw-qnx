@@ -42,6 +42,7 @@ if(RELMW_QNX)
     src/platform/qnx/qnx_timer.cpp
     src/platform/qnx/qnx_log.cpp
     src/platform/qnx/qnx_resmgr.cpp
+    src/platform/qnx/qnx_robot_link.cpp
     src/platform/latency.cpp)
   target_link_libraries(relmw_platform PUBLIC relmw_core slog2)
 else()
@@ -65,12 +66,10 @@ add_executable(relmw_supervisor apps/relmw_supervisor.cpp)
 target_link_libraries(relmw_supervisor relmw_platform)
 
 # Robot driver process (owns the simulator + ground truth; supervisor talks to it over the robot link).
-# Host build only: the QNX transport (/dev/robot0 resmgr) is wired by the reviewer afterwards.
-if(NOT RELMW_QNX)
-  add_executable(relmw_robotd apps/relmw_robotd.cpp)
-  target_link_libraries(relmw_robotd relmw_platform)
-  install(TARGETS relmw_robotd DESTINATION bin)
-endif()
+# POSIX: AF_UNIX SOCK_SEQPACKET socket; QNX: resource manager /dev/robot0 (_IO_MSG + MsgReply, src/platform/qnx/qnx_robot_link.cpp).
+add_executable(relmw_robotd apps/relmw_robotd.cpp)
+target_link_libraries(relmw_robotd relmw_platform)
+install(TARGETS relmw_robotd DESTINATION bin)
 
 if(RELMW_QNX)
   add_executable(relmw_ham_setup apps/relmw_ham_setup.cpp)

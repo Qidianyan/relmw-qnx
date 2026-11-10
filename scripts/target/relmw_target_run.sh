@@ -77,6 +77,55 @@ else
 fi
 stop_pid "$SUP"
 
+# 5b. Robot driver as a separate process (C6): relmw_robotd = resource manager /dev/robot0, the supervisor sends every
+#     robot request as an _IO_MSG with MsgSend(). Same seeds -> same counters and the same library as in-process.
+cnt_line() { grep -m1 '^episodes=' "$1"; }
+cp "$OUT/bench/failure_library.txt" "$OUT/lib_rb_local.txt"; cp "$OUT/bench/failure_library.txt" "$OUT/lib_rb_remote.txt"
+"$BIN/relmw_robotd" --path /dev/robot0 > "$OUT/70_robotd.txt" 2>&1 &
+RBD=$!
+if wait_file /dev/robot0 10; then
+  step 71_cat_robot0 sh -c "ls -l /dev/robot0; cat /dev/robot0"
+  step 72_sup_remote "$BIN/relmw_supervisor" --episodes 10 --period-us 1000 --sched fifo --prio 40 --mount /dev/relmw_rb \
+        --library "$OUT/lib_rb_remote.txt" --robot /dev/robot0 --report "$OUT/rt_report_robotd.json"
+  step 73_sup_local "$BIN/relmw_supervisor" --episodes 10 --period-us 1000 --sched fifo --prio 40 --mount /dev/relmw_lc \
+        --library "$OUT/lib_rb_local.txt" --report "$OUT/rt_report_inproc.json"
+  if [ "$(cnt_line "$OUT/72_sup_remote.txt")" = "$(cnt_line "$OUT/73_sup_local.txt")" ] && cmp -s "$OUT/lib_rb_remote.txt" "$OUT/lib_rb_local.txt"; then
+    ok "74_robotd_equivalence ($(cnt_line "$OUT/72_sup_remote.txt"))"
+  else bad "74_robotd_equivalence"; fi
+  step 75_cat_robot0_after sh -c "cat /dev/robot0"
+  # Driver crash mid-run: kill robotd with SIGKILL while the supervisor runs, start a new one; the supervisor must
+  # reconnect, re-run the same episode and end with the same counters as the in-process run.
+  cp "$OUT/bench/failure_library.txt" "$OUT/lib_rb_crash.txt"
+  "$BIN/relmw_supervisor" --episodes 10 --period-us 1000 --sched fifo --prio 40 --mount /dev/relmw_rc \
+        --library "$OUT/lib_rb_crash.txt" --robot /dev/robot0 > "$OUT/76_sup_crash.txt" 2>&1 &
+  SUPC=$!
+  sleep 3; "$SLAY" -f -9 -m pid "$RBD"; note "robotd $RBD killed (SIGKILL)"
+  sleep 1; "$BIN/relmw_robotd" --path /dev/robot0 >> "$OUT/70_robotd.txt" 2>&1 & RBD=$!
+  i=0; while kill -0 "$SUPC" 2>/dev/null && [ $i -lt 120 ]; do sleep 1; i=$((i+1)); done
+  if [ "$(cnt_line "$OUT/76_sup_crash.txt")" = "$(cnt_line "$OUT/73_sup_local.txt")" ] && grep -q '^robot_link_errors=[1-9]' "$OUT/76_sup_crash.txt" \
+     && cmp -s "$OUT/lib_rb_crash.txt" "$OUT/lib_rb_local.txt"; then
+    ok "77_robotd_crash_recovery ($(grep -m1 '^robot_link_errors=' "$OUT/76_sup_crash.txt"))"
+  else bad "77_robotd_crash_recovery"; fi
+  stop_pid "$SUPC"
+else
+  bad "71_robotd (/dev/robot0 did not appear)"
+fi
+stop_pid "$RBD"
+
+# 5c. CPU affinity (C8): control thread on its own CPU (cluster _cpu-1 when there are >= 2 CPUs), under the same load.
+step 80_clusters pidin syspage=cluster
+NCPU=$(pidin info 2>/dev/null | grep -c 'Processor[0-9]*:')
+if [ "${NCPU:-1}" -ge 2 ]; then
+  LOADPIDS=""; for k in 1 2; do ( while :; do :; done ) & LOADPIDS="$LOADPIDS $!"; done
+  cp "$OUT/bench/failure_library.txt" "$OUT/lib_cpu1.txt"
+  step 81_sup_fifo_load_cpu1 "$BIN/relmw_supervisor" --episodes 30 --period-us 1000 --sched fifo --prio 40 --cpu 1 \
+        --mount /dev/relmw_cpu1 --library "$OUT/lib_cpu1.txt" --report "$OUT/rt_report_fifo_load_cpu1.json"
+  for p in $LOADPIDS; do stop_pid "$p"; done
+  grep -q '^control_affinity=_cpu-1' "$OUT/81_sup_fifo_load_cpu1.txt" && ok 82_affinity_applied || bad 82_affinity_applied
+else
+  note "80: only ${NCPU:-1} CPU(s) in this VM: affinity run skipped (boot QEMU with >= 2 vCPUs)"
+fi
+
 # 6. slog2 evidence (C3')
 step 50_slog2info sh -c "slog2info -b relmw | tail -200"
 
@@ -104,6 +153,26 @@ if command -v ham >/dev/null; then
   else bad "63_ham_restart (supervisor not started by HAM)"; fi
 else
   bad "60_ham (ham binary not on target; install the HAM package and add it to the image)"
+fi
+
+# 7b. HAM restarts the robot driver too (C6 + C4: "task layer + process layer" recovery)
+if command -v ham >/dev/null && [ -x "$BIN/relmw_robotd" ]; then
+  step 90_ham_setup_robotd "$BIN/relmw_ham_setup" --name relmw_robotd "$BIN/relmw_robotd --path /dev/robot0"
+  sleep 2
+  cp "$OUT/bench/failure_library.txt" "$OUT/lib_rb_ham.txt"
+  "$BIN/relmw_supervisor" --episodes 10 --period-us 1000 --sched fifo --prio 40 --mount /dev/relmw_rh \
+        --library "$OUT/lib_rb_ham.txt" --robot /dev/robot0 > "$OUT/91_sup_ham_robotd.txt" 2>&1 &
+  SUPH=$!
+  sleep 3
+  R1=$(pidin -f an | awk '/relmw_robotd/ {print $1; exit}')
+  [ -n "$R1" ] && "$SLAY" -f -9 -m pid "$R1"
+  i=0; while kill -0 "$SUPH" 2>/dev/null && [ $i -lt 120 ]; do sleep 1; i=$((i+1)); done
+  R2=$(pidin -f an | awk '/relmw_robotd/ {print $1; exit}')
+  if [ -n "$R1" ] && [ -n "$R2" ] && [ "$R1" != "$R2" ] && grep -q '^robot_link_errors=[1-9]' "$OUT/91_sup_ham_robotd.txt" \
+     && [ "$(cnt_line "$OUT/91_sup_ham_robotd.txt")" = "$(cnt_line "$OUT/73_sup_local.txt")" ]; then
+    ok "92_ham_restarts_robotd (pid $R1 -> $R2, supervisor re-ran the episode, counters == in-process)"
+  else bad "92_ham_restarts_robotd (pid '$R1' -> '$R2')"; fi
+  stop_pid "$SUPH"
 fi
 
 note "SUMMARY pass=$PASS fail=$FAIL"

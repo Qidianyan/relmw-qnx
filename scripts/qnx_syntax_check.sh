@@ -10,7 +10,8 @@ cd "$(dirname "$0")/.."
 CXX="${CXX:-g++}"
 FLAGS=(-std=c++17 -fsyntax-only -Wall -Wextra -Werror -D__QNX__ -isystem tools/qnx_stubs/include -Iinclude)
 FILES=(src/platform/qnx/qnx_timer.cpp src/platform/qnx/qnx_log.cpp src/platform/qnx/qnx_resmgr.cpp
-       src/platform/latency.cpp apps/relmw_supervisor.cpp apps/relmw_ham_setup.cpp)
+       src/platform/qnx/qnx_robot_link.cpp src/platform/latency.cpp src/core/robot_link.cpp
+       apps/relmw_supervisor.cpp apps/relmw_ham_setup.cpp apps/relmw_robotd.cpp)
 rc=0
 for f in "${FILES[@]}"; do
   if "$CXX" "${FLAGS[@]}" "$f"; then echo "OK    $f"; else echo "FAIL  $f"; rc=1; fi
@@ -35,5 +36,11 @@ neg "unknown sched_param member" '#include <sched.h>
 int f(){ struct sched_param p; return p.sched_ss_budget; }'
 neg "MsgReceivePulse() with 3 args" '#include <sys/neutrino.h>
 int f(int c, struct _pulse* p){ return MsgReceivePulse(c, p, sizeof *p); }'
+neg "MsgReply() without status" '#include <sys/neutrino.h>
+int f(rcvid_t r, const void* m){ return MsgReply(r, m, 8); }'
+neg "io_funcs.msg with a devctl-style handler" '#include <sys/iofunc.h>
+int h(resmgr_context_t*, io_read_t*, iofunc_ocb_t*); void f(resmgr_io_funcs_t* io){ io->msg = h; }'
+neg "pthread_cluster_set() without tid" '#include <pthread.h>
+int f(){ return pthread_cluster_set("_cpu-0"); }'
 [ $rc -eq 0 ] && echo "qnx_syntax_check: all QNX translation units pass -fsyntax-only against 8.0 stubs"
 exit $rc

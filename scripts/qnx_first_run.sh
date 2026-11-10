@@ -9,7 +9,8 @@
 #
 # Steps (each logged to results/qnx_qemu_x86_64/first_run_<UTC timestamp>/NN_*.log):
 #   0 preflight   SDP env script, qcc/q++, mkqnximage, qemu-system-x86_64, ssh/scp, KVM (optional)
-#   1 static      scripts/qnx_syntax_check.sh (host stubs) — must stay green
+#   1 static      scripts/qnx_syntax_check.sh (host stubs) — must stay green; secpolcompile check of
+#                 config/secpol/relmw_secpol.txt (host tool from the SDP; -m, output discarded) + tools/secpol_lint.py
 #   2 build       cmake + q++ for x86_64 (scripts/build_qnx.sh); `file` on every binary
 #   3 image       mkqnximage --type=qemu --arch=x86_64 in ./qnx-vm (first time only), boot headless, --getip
 #   4 deploy      scp binaries + scripts/target/relmw_target_run.sh to /data/relmw on the target
@@ -65,7 +66,10 @@ if [ -f "$QNX_SDP/qnxsdp-env.sh" ]; then
 fi
 { echo "QNX_SDP=$QNX_SDP"; uname -a; qemu-system-x86_64 --version 2>/dev/null | head -1; cmake --version | head -1
   [ -e /dev/kvm ] && echo "KVM: available" || echo "KVM: not available (QEMU falls back to TCG; slower, latency numbers are emulator numbers)"
-  command -v qcc >/dev/null && qcc -V 2>&1 | head -5; } > "$RUN/00_preflight.log" 2>&1
+  command -v qcc >/dev/null && qcc -V 2>&1 | head -5
+  # C8 needs >= 2 vCPUs in the VM; record which mkqnximage option sets that (the 8.0 doc page defers to --help/--options)
+  command -v mkqnximage >/dev/null && { mkqnximage --help 2>&1; mkqnximage --options 2>&1; } | grep -iE 'cpu|smp' | head -10
+  command -v secpolcompile >/dev/null && echo "secpolcompile: $(command -v secpolcompile)"; } > "$RUN/00_preflight.log" 2>&1
 if [ ${#missing[@]} -gt 0 ]; then
   log "PREFLIGHT: prerequisites missing — nothing was built or changed:"
   for m in "${missing[@]}"; do log "  - $m"; done
@@ -76,6 +80,12 @@ log "PREFLIGHT: all prerequisites present ($(grep KVM "$RUN/00_preflight.log"))"
 
 # ---- 1 static + 2 build --------------------------------------------------------------------------------------
 run_step 01_static scripts/qnx_syntax_check.sh
+run_step 01b_secpol_lint python3 tools/secpol_lint.py config/secpol/relmw_secpol.txt --repo .
+if command -v secpolcompile >/dev/null; then
+  # Draft policy (docs/secpol.md): the extern types slogger2_t / ham_t must exist in the image's policy; compiling the
+  # file alone shows whether our part is valid 8.0 policy language. Not pushed to the target in this run.
+  run_step 01c_secpolcompile secpolcompile -m -o "$RUN/relmw_secpol.bin" config/secpol/relmw_secpol.txt
+fi
 run_step 02_build scripts/build_qnx.sh "$ARCH" || { log "build failed: fix and re-run (see 02_build.log)"; exit 1; }
 B="$ROOT/build-qnx-$ARCH"
 run_step 02b_file bash -c "file $B/relmw_* $B/test_* | tee /dev/stderr | grep -q ldqnx"  # QNX ELF interpreter is ldqnx-64.so.2
