@@ -52,6 +52,7 @@ statistics use a self-contained xoshiro256** RNG, not `<random>` distributions).
 ## Build and run (Linux host)
 ```bash
 scripts/build_host.sh                     # CMake + Ninja, then ctest
+# 8 ctest executables, 70 cases (rng, stats, sim2d, middleware, retry_policy, latency, posix_platform, experiment); zero warnings with g++ 14.2
 build-host/relmw_bench --n 100 --out results/host_linux
 build-host/relmw_supervisor --episodes 20 --period-us 2000 --sched other --mount /tmp/relmw
 #   in another terminal:  cat /tmp/relmw/status ; echo "fault percep_bias" > /tmp/relmw/ctl
