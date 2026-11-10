@@ -4,7 +4,7 @@
 # relmwctl - operator CLI for the relmw supervisor control surface.
 #
 #   relmwctl [-m DIR] status | events [N] | fault <none|bump|percep_bias|slippery|random|nominal>
-#            | arm <mw|naive|none> | knock | pause | resume | reset-stats | quit | watch [SECONDS]
+#            | plan <push_A[,push_B...]> | arm <mw|naive|none> | knock | pause | resume | reset-stats | quit | watch [SECONDS]
 #
 # DIR defaults to $RELMW_MOUNT, else /dev/relmw if it exists, else /tmp/relmw.
 # POSIX sh only: runs under QNX ksh as well as Linux dash/bash.
@@ -16,7 +16,7 @@ set -u
 
 usage() {
   echo "usage: relmwctl [-m DIR] status | events [N] | fault <none|bump|percep_bias|slippery|random|nominal>" >&2
-  echo "                 | arm <mw|naive|none> | knock | pause | resume | reset-stats | quit | watch [SECONDS]" >&2
+  echo "                 | plan <push_A[,push_B...]> | arm <mw|naive|none> | knock | pause | resume | reset-stats | quit | watch [SECONDS]" >&2
 }
 
 DIR=${RELMW_MOUNT:-}
@@ -103,7 +103,7 @@ case $cmd in
       cat "$DIR/status"
       sleep "$secs"
     done;;
-  fault|arm)
+  fault|plan|arm)
     [ -n "$arg" ] || { usage; exit 2; }
     send_cmd "$cmd $arg"; exit $?;;
   knock|pause|resume|reset-stats|quit)
