@@ -1,0 +1,64 @@
+ep=1023 tick=219 ROLLBACK push_A attempt=0 strategy= mode=none
+ep=1023 tick=219 RETRY push_A attempt=1 strategy=relocalize mode=none
+ep=1023 tick=259 SUBTASK_OK push_A attempt=1 strategy=relocalize mode=none
+ep=1023 tick=259 SUBTASK_START push_B attempt=0 strategy=relocalize(proactive) mode=none
+ep=1023 tick=304 SUBTASK_OK push_B attempt=0 strategy=relocalize(proactive) mode=none
+ep=1023 tick=304 EPISODE_DONE  attempt=0 strategy= mode=none
+EPISODE 1023 SUCCESS
+EPISODE 1024 start arm=mw fault=percep_bias
+ep=1024 tick=0 SUBTASK_START push_A attempt=0 strategy=first_try mode=none
+ep=1024 tick=200 VERIFY_FAIL push_A attempt=0 strategy=first_try mode=wrong_side_stall
+ep=1024 tick=232 ROLLBACK push_A attempt=0 strategy= mode=none
+ep=1024 tick=232 RETRY push_A attempt=1 strategy=relocalize mode=none
+ep=1024 tick=277 SUBTASK_OK push_A attempt=1 strategy=relocalize mode=none
+ep=1024 tick=277 SUBTASK_START push_B attempt=0 strategy=relocalize(proactive) mode=none
+ep=1024 tick=337 SUBTASK_OK push_B attempt=0 strategy=relocalize(proactive) mode=none
+ep=1024 tick=337 EPISODE_DONE  attempt=0 strategy= mode=none
+EPISODE 1024 SUCCESS
+EPISODE 1025 start arm=mw fault=percep_bias
+ep=1025 tick=0 SUBTASK_START push_A attempt=0 strategy=first_try mode=none
+ep=1025 tick=200 VERIFY_FAIL push_A attempt=0 strategy=first_try mode=off_axis_drift
+ep=1025 tick=217 ROLLBACK push_A attempt=0 strategy= mode=none
+ep=1025 tick=217 RETRY push_A attempt=1 strategy=relocalize mode=none
+ep=1025 tick=257 SUBTASK_OK push_A attempt=1 strategy=relocalize mode=none
+ep=1025 tick=257 SUBTASK_START push_B attempt=0 strategy=relocalize(proactive) mode=none
+ep=1025 tick=312 SUBTASK_OK push_B attempt=0 strategy=relocalize(proactive) mode=none
+ep=1025 tick=312 EPISODE_DONE  attempt=0 strategy= mode=none
+EPISODE 1025 SUCCESS
+EPISODE 1026 start arm=mw fault=percep_bias
+ep=1026 tick=0 SUBTASK_START push_A attempt=0 strategy=first_try mode=none
+ep=1026 tick=200 VERIFY_FAIL push_A attempt=0 strategy=first_try mode=off_axis_drift
+ep=1026 tick=215 ROLLBACK push_A attempt=0 strategy= mode=none
+ep=1026 tick=215 RETRY push_A attempt=1 strategy=relocalize mode=none
+ep=1026 tick=255 SUBTASK_OK push_A attempt=1 strategy=relocalize mode=none
+ep=1026 tick=255 SUBTASK_START push_B attempt=0 strategy=relocalize(proactive) mode=none
+ep=1026 tick=310 SUBTASK_OK push_B attempt=0 strategy=relocalize(proactive) mode=none
+ep=1026 tick=310 EPISODE_DONE  attempt=0 strategy= mode=none
+EPISODE 1026 SUCCESS
+EPISODE 1027 start arm=mw fault=percep_bias
+ep=1027 tick=0 SUBTASK_START push_A attempt=0 strategy=first_try mode=none
+ep=1027 tick=200 VERIFY_FAIL push_A attempt=0 strategy=first_try mode=off_axis_drift
+ep=1027 tick=213 ROLLBACK push_A attempt=0 strategy= mode=none
+ep=1027 tick=213 RETRY push_A attempt=1 strategy=relocalize mode=none
+ep=1027 tick=258 SUBTASK_OK push_A attempt=1 strategy=relocalize mode=none
+ep=1027 tick=258 SUBTASK_START push_B attempt=0 strategy=relocalize(proactive) mode=none
+ep=1027 tick=308 SUBTASK_OK push_B attempt=0 strategy=relocalize(proactive) mode=none
+ep=1027 tick=308 EPISODE_DONE  attempt=0 strategy= mode=none
+EPISODE 1027 SUCCESS
+EPISODE 1028 start arm=mw fault=percep_bias
+ep=1028 tick=0 SUBTASK_START push_A attempt=0 strategy=first_try mode=none
+ep=1028 tick=55 SUBTASK_OK push_A attempt=0 strategy=first_try mode=none
+ep=1028 tick=55 SUBTASK_START push_B attempt=0 strategy=first_try mode=none
+ep=1028 tick=125 SUBTASK_OK push_B attempt=0 strategy=first_try mode=none
+ep=1028 tick=125 EPISODE_DONE  attempt=0 strategy= mode=none
+EPISODE 1028 SUCCESS
+EPISODE 1029 start arm=mw fault=percep_bias
+ep=1029 tick=0 SUBTASK_START push_A attempt=0 strategy=first_try mode=none
+ep=1029 tick=200 VERIFY_FAIL push_A attempt=0 strategy=first_try mode=off_axis_drift
+ep=1029 tick=217 ROLLBACK push_A attempt=0 strategy= mode=none
+ep=1029 tick=217 RETRY push_A attempt=1 strategy=relocalize mode=none
+ep=1029 tick=262 SUBTASK_OK push_A attempt=1 strategy=relocalize mode=none
+ep=1029 tick=262 SUBTASK_START push_B attempt=0 strategy=relocalize(proactive) mode=none
+ep=1029 tick=312 SUBTASK_OK push_B attempt=0 strategy=relocalize(proactive) mode=none
+ep=1029 tick=312 EPISODE_DONE  attempt=0 strategy= mode=none
+EPISODE 1029 SUCCESS
