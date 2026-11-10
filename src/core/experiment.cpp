@@ -20,14 +20,14 @@ const char* to_string(Arm a) {
   return "?";
 }
 
-std::vector<Subtask> make_task(PushSim2D& sim, std::uint64_t ep) {
+std::vector<Subtask> make_task(TruthSensor& truth, std::uint64_t ep) {
   std::vector<Subtask> sts;
   for (int i = 0; i < kNumObjects; ++i) {
     Subtask st;
     st.name = std::string("push_") + object_name(i);
-    auto cam = std::make_shared<CameraVerifier>(&sim, i, hash_mix({0xC0u, ep, (std::uint64_t)i}));
+    auto cam = std::make_shared<CameraVerifier>(&truth, i, hash_mix({0xC0u, ep, (std::uint64_t)i}));
     st.verifier = [cam](const Obs& o) { return (*cam)(o); };
-    st.oracle = [&sim, i](const Obs&) { return oracle_verdict(sim.true_state(), i); };
+    st.oracle = [&truth, i](const Obs&) { return oracle_verdict(truth.truth(), i); };
     st.max_steps = 200; st.check_every = 5; st.hold = 2;
     st.meta.object = i; st.meta.goal_xy = goal_of(i);
     sts.push_back(st);

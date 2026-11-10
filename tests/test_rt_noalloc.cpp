@@ -10,6 +10,7 @@
 #include "relmw/latency.hpp"
 #include "relmw/platform.hpp"
 #include "relmw/policy.hpp"
+#include "relmw/robot_link.hpp"
 #include "relmw/sim2d.hpp"
 
 #include <atomic>
@@ -167,6 +168,28 @@ TEST(rt_episode_allocs_only_at_boundaries) {
   CHECK(total >= 0);
   CHECK(dticks > 0);
   CHECK(per_tick < 1.0);   // << 1: allocations only at subtask/attempt boundaries, never per tick
+}
+
+// 7. RemoteRobot::step over LoopbackTransport x2000 after warm-up (hello + reset outside the counted
+//    region) -> 0 allocations: the success path is stack-only request/reply structs.
+TEST(rt_remote_robot_step_no_alloc) {
+  relmw::RobotServer server;
+  relmw::LoopbackTransport transport(server);
+  relmw::RemoteRobot robot(transport);
+  relmw::SimConfig sc;
+  robot.reset(7, sc);
+  for (int w = 0; w < 10; ++w) robot.step(relmw::Vec2{0.25, 0.20});   // warm-up (setup, not measured)
+  CHECK(robot.ticks() == 10);
+  {
+    CountAllocs ca;
+    for (int i = 0; i < 2000; ++i) {
+      relmw::Obs o = robot.step(relmw::Vec2{0.25, 0.20});
+      volatile double sink = o.pusher.x + o.obj[0].x + o.obj[1].x;
+      (void)sink;
+    }
+    CHECK(ca.n() == 0);
+  }
+  CHECK(robot.ticks() == 2010);
 }
 
 TEST_MAIN()

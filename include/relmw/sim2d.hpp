@@ -31,7 +31,7 @@ constexpr double kTick = 0.05;        // control period of one step() in simulat
 constexpr int kSubsteps = 10;
 Vec2 goal_of(int obj);
 
-class PushSim2D : public RobotAdapter {
+class PushSim2D : public RobotAdapter, public TruthSensor {
  public:
   PushSim2D(std::uint64_t seed, const SimConfig& cfg = {});
   Obs get_obs() override;
@@ -41,6 +41,7 @@ class PushSim2D : public RobotAdapter {
 
   // Ground truth (evaluation / verifier camera only; never given to the policy).
   Obs true_state() const;
+  Obs truth() override { return true_state(); }   // TruthSensor (overhead camera)
   Fault fault() const { return fault_; }
   long ticks() const { return t_; }
   double friction() const { return mu_; }

@@ -36,7 +36,7 @@ struct ExperimentConfig {
   double policy_bias_std = 0.15;
 };
 
-std::vector<Subtask> make_task(PushSim2D& sim, std::uint64_t ep);
+std::vector<Subtask> make_task(TruthSensor& truth, std::uint64_t ep);
 EpisodeResult run_episode(int ep, bool field, Arm arm, RetryPolicy* rp, const ExperimentConfig& cfg,
                           EventSink sink = nullptr);
 

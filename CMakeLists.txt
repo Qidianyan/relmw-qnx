@@ -32,6 +32,7 @@ add_library(relmw_core STATIC
   src/core/middleware.cpp
   src/core/stats.cpp
   src/core/experiment.cpp
+  src/core/robot_link.cpp
 )
 target_include_directories(relmw_core PUBLIC include)
 
@@ -48,6 +49,7 @@ else()
     src/platform/posix/posix_timer.cpp
     src/platform/posix/posix_log.cpp
     src/platform/posix/posix_ctl.cpp
+    src/platform/posix/posix_robot_link.cpp
     src/platform/latency.cpp)
   target_link_libraries(relmw_platform PUBLIC relmw_core)
   find_package(Threads REQUIRED)
@@ -62,6 +64,14 @@ target_link_libraries(relmw_bench relmw_core)
 add_executable(relmw_supervisor apps/relmw_supervisor.cpp)
 target_link_libraries(relmw_supervisor relmw_platform)
 
+# Robot driver process (owns the simulator + ground truth; supervisor talks to it over the robot link).
+# Host build only: the QNX transport (/dev/robot0 resmgr) is wired by the reviewer afterwards.
+if(NOT RELMW_QNX)
+  add_executable(relmw_robotd apps/relmw_robotd.cpp)
+  target_link_libraries(relmw_robotd relmw_platform)
+  install(TARGETS relmw_robotd DESTINATION bin)
+endif()
+
 if(RELMW_QNX)
   add_executable(relmw_ham_setup apps/relmw_ham_setup.cpp)
   target_link_libraries(relmw_ham_setup ham)
@@ -73,7 +83,7 @@ install(TARGETS relmw_bench relmw_supervisor DESTINATION bin)
 
 # ---- tests (ctest) ----------------------------------------------------------
 enable_testing()
-foreach(t test_rng test_stats test_sim2d test_middleware test_retry_policy test_latency test_posix_platform test_experiment test_rt_noalloc)
+foreach(t test_rng test_stats test_sim2d test_middleware test_retry_policy test_latency test_posix_platform test_experiment test_rt_noalloc test_robot_link)
   if(RELMW_QNX AND t STREQUAL "test_posix_platform")
     continue()   # exercises the POSIX control surface (FIFO files); the QNX layer is covered by scripts/target/relmw_target_run.sh
   endif()
@@ -86,6 +96,7 @@ endforeach()
 
 if(NOT RELMW_QNX)
   add_test(NAME test_supervisor_e2e COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_supervisor_e2e.sh $<TARGET_FILE:relmw_supervisor> ${CMAKE_CURRENT_SOURCE_DIR}/scripts/relmwctl)
+  add_test(NAME test_robotd_e2e COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_robotd_e2e.sh $<TARGET_FILE:relmw_robotd> $<TARGET_FILE:relmw_supervisor>)
   # QNX 8.0 layer: -fsyntax-only against transcribed API stubs (+ stub self-test). GCC only (stubs wrap glibc headers).
   if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     add_test(NAME test_qnx_syntax COMMAND ${CMAKE_COMMAND} -E env CXX=${CMAKE_CXX_COMPILER} bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/qnx_syntax_check.sh)

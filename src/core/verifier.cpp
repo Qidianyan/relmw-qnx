@@ -25,7 +25,7 @@ static Verdict judge(Vec2 p, Vec2 pusher, int obj, double margin) {
 }
 
 Verdict CameraVerifier::operator()(const Obs&) {
-  Obs t = sim_->true_state();
+  Obs t = truth_->truth();
   Vec2 est = t.obj[obj_] + Vec2{rng_.normal(0, sigma_), rng_.normal(0, sigma_)};
   return judge(est, t.pusher, obj_, kVerifierMargin);
 }
