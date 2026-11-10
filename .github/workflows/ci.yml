@@ -1,0 +1,30 @@
+# Host CI: build + ctest on Linux with GCC and Clang, plus the QNX 8.0 API syntax check against the stubs.
+# (The real QNX build needs a licensed SDP and runs locally via scripts/qnx_first_run.sh.)
+name: ci
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        cxx: [g++, clang++]
+    steps:
+      - uses: actions/checkout@v4
+      - name: deps
+        run: sudo apt-get update && sudo apt-get install -y ninja-build cmake clang
+      - name: build and test
+        env:
+          CXX: ${{ matrix.cxx }}
+        run: |
+          cmake -S . -B build-host -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-host
+          ctest --test-dir build-host --output-on-failure
+      - name: determinism (results identical to committed host run)
+        run: |
+          build-host/relmw_bench --n 100 --out /tmp/relmw_ci
+          cmp /tmp/relmw_ci/episodes.jsonl results/host_linux/episodes.jsonl
+      - name: QNX 8.0 API syntax check (stubs)
+        if: matrix.cxx == 'g++'
+        run: scripts/qnx_syntax_check.sh
