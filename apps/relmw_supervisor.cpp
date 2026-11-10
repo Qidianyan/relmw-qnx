@@ -8,25 +8,34 @@
 //  * Control surface: QNX resource manager /dev/relmw/{status,events,ctl} (Linux host: files + FIFO in /tmp/relmw).
 //  * Logging: slog2 on QNX (`slog2info -b relmw`), stderr on Linux.
 //  * Watchdog: optional HAM self-attach with heartbeat (--ham), plus apps/relmw_ham_setup for restart-on-death.
+//  * Robot source: the in-process PushSim2D (default, bit-identical to the benchmark) or the driver process
+//    relmw_robotd over the fixed-size robot link (--robot PATH): one request -> one reply, synchronous, like
+//    QNX MsgSend/MsgReceive/MsgReply. If the link drops mid-episode the episode is re-run from the same seed
+//    after reconnecting (process-level recovery; the task-level rollback/retry layer is untouched).
 //
 //   relmw_supervisor [--episodes N] [--period-us 2000] [--arm mw|naive|none] [--nominal] [--prio 40]
 //                    [--sched fifo|sporadic|other] [--mount DIR] [--library FILE] [--report FILE] [--ham]
-//                    [--heartbeat-ms N]
+//                    [--heartbeat-ms N] [--robot PATH]
 #include "relmw/experiment.hpp"
 #include "relmw/latency.hpp"
 #include "relmw/platform.hpp"
 #include "relmw/policy.hpp"
+#include "relmw/robot_link.hpp"
+#include "relmw/robot_link_os.hpp"
 #include "relmw/verifier.hpp"
 #include <atomic>
 #include <cerrno>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <deque>
 #include <fstream>
+#include <memory>
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <thread>
 
 using namespace relmw;
 namespace pf = relmw::platform;
@@ -37,12 +46,14 @@ struct Shared {
   std::mutex mu;
   // counters
   int episodes = 0, success = 0, recovered = 0, escalated = 0, failures_detected = 0;
+  int robot_link_errors = 0;
   int cur_ep = 0; std::string cur_fault = "-", cur_subtask = "-", cur_strategy = "-"; int cur_attempt = 0;
   std::deque<std::string> events;     // ring buffer, newest last
   LatencyStats lat, compute;
   long ticks = 0;
   // commands
   std::string arm = "mw";
+  std::string robot_desc = "in-process";    // "in-process" or the --robot PATH
   int force_fault = -2;               // -2 = random field faults, -1 = nominal, >=0 forced
   bool paused = false, knock = false;
   std::atomic<bool> quit{false};
@@ -86,8 +97,10 @@ std::string status_text(std::int64_t period_ns, size_t lib_entries, const std::s
   std::ostringstream o;
   o << "relmw supervisor on " << platform_name() << "\n"
     << "arm=" << S.arm << " paused=" << (S.paused ? "yes" : "no") << "\n"
+    << "robot=" << S.robot_desc << "\n"
     << "episodes=" << S.episodes << " success=" << S.success << " recovered=" << S.recovered
     << " failures_detected=" << S.failures_detected << " escalated=" << S.escalated << "\n"
+    << "robot_link_errors=" << S.robot_link_errors << "\n"
     << "current: ep=" << S.cur_ep << " fault=" << S.cur_fault << " subtask=" << S.cur_subtask
     << " attempt=" << S.cur_attempt << " strategy=" << S.cur_strategy << "\n"
     << "control loop: period_us=" << us(period_ns) << " ticks=" << S.ticks
@@ -136,33 +149,45 @@ std::string handle_command(const std::string& line) {
   return "ERR commands: fault <x> | arm <mw|naive|none> | knock | pause | resume | reset-stats | quit";
 }
 
-// Robot adapter that paces every tick on the real-time timer and measures release latency + compute time.
+// Real-time robot adapter: wraps any RobotAdapter (the in-process PushSim2D or a RemoteRobot over the
+// driver process), paces every tick on the real-time timer, measures release latency + compute time, and
+// services the knock control command. The knock and ticks callbacks adapt to whichever robot is bound.
 class RealtimeRobot : public RobotAdapter {
  public:
   explicit RealtimeRobot(pf::PeriodicTimer& t) : timer_(t) {}
-  PushSim2D* sim = nullptr;
-  Obs get_obs() override { return sim->get_obs(); }
-  Vec2 robot_pose() override { return sim->robot_pose(); }
+  void bind(RobotAdapter& dev, std::function<void()> knock_cb, std::function<long()> ticks_cb) {
+    dev_ = &dev;
+    knock_cb_ = std::move(knock_cb);
+    ticks_cb_ = std::move(ticks_cb);
+  }
+  Obs get_obs() override { return dev_->get_obs(); }
+  Vec2 robot_pose() override { return dev_->robot_pose(); }
   void move_robot_to(Vec2 pose, int steps) override {
-    for (int k = 0; k < steps; ++k) { step(pose); if ((sim->robot_pose() - pose).norm() < 0.01) break; }
+    for (int k = 0; k < steps; ++k) { step(pose); if ((dev_->robot_pose() - pose).norm() < 0.01) break; }
   }
   Obs step(Vec2 target) override {
     if (last_wake_) S.compute.record(pf::now_ns() - last_wake_);   // work done since the previous release
     std::int64_t late = timer_.wait_tick();
     last_wake_ = pf::now_ns();
-    if (late < 0) { S.quit = true; return sim->get_obs(); }
+    if (late < 0) { S.quit = true; return dev_->get_obs(); }
     {
       std::lock_guard<std::mutex> g(S.mu);
       S.lat.record(late);
       ++S.ticks;
-      if (S.knock) { S.knock = false; sim->knock(0, Vec2{0.0, -0.10}); push_event("CTL knock: cube A displaced 10 cm"); }
+      if (S.knock) { S.knock = false; if (knock_cb_) knock_cb_(); }
+      if (ticks_cb_) last_ticks_ = ticks_cb_();      // event log line prints the robot's tick count
     }
     heartbeat_if_due();
-    return sim->step(target);
+    return dev_->step(target);
   }
+  long robot_ticks() const { return last_ticks_; }
  private:
   pf::PeriodicTimer& timer_;
+  RobotAdapter* dev_ = nullptr;
+  std::function<void()> knock_cb_;
+  std::function<long()> ticks_cb_;
   std::int64_t last_wake_ = 0;
+  long last_ticks_ = 0;
 };
 
 }  // namespace
@@ -170,7 +195,7 @@ class RealtimeRobot : public RobotAdapter {
 int main(int argc, char** argv) {
   int episodes = 20, prio = 40, heartbeat_ms = kHeartbeatPeriodMs;
   std::int64_t period_ns = 2000000;
-  std::string sched = "fifo", report, library;
+  std::string sched = "fifo", report, library, robot_path;
   bool ham = false;
 #ifdef __QNX__
   std::string mount = "/dev/relmw";
@@ -191,12 +216,15 @@ int main(int argc, char** argv) {
     else if (a == "--report") report = next();
     else if (a == "--ham") ham = true;
     else if (a == "--heartbeat-ms") heartbeat_ms = std::atoi(next().c_str());
+    else if (a == "--robot") robot_path = next();
     else { std::fprintf(stderr, "see header of apps/relmw_supervisor.cpp for usage\n"); return 2; }
   }
+  const bool robot_mode = !robot_path.empty();
   heartbeat_period_ns = heartbeat_ms * 1000000LL;
   pf::log_init("relmw");
-  pf::log(pf::Level::Info, "relmw_supervisor start: platform=%s period_us=%lld sched=%s prio=%d episodes=%d",
-          platform_name(), (long long)(period_ns / 1000), sched.c_str(), prio, episodes);
+  pf::log(pf::Level::Info, "relmw_supervisor start: platform=%s period_us=%lld sched=%s prio=%d episodes=%d robot=%s",
+          platform_name(), (long long)(period_ns / 1000), sched.c_str(), prio, episodes,
+          robot_mode ? robot_path.c_str() : "in-process");
 
   CorrelationAwareRetry lib;
   if (!library.empty()) {
@@ -222,7 +250,42 @@ int main(int argc, char** argv) {
   pf::PeriodicTimer timer(period_ns);
   S.lat.set_deadline(period_ns / 2);    // a release later than half a period counts as a deadline miss
   RealtimeRobot robot(timer);
+
+  // Robot link state: the driver process (remote mode) or the in-process simulator (default).
+  std::unique_ptr<RobotTransport> transport;
+  std::unique_ptr<RemoteRobot> remote;
   ExperimentConfig ecfg;
+
+  auto connect_remote = [&]() -> bool {
+    std::string e;
+    std::unique_ptr<RobotTransport> t = robot_connect(robot_path, &e);
+    if (!t) { pf::log(pf::Level::Error, "robot_connect(%s) failed: %s", robot_path.c_str(), e.c_str()); return false; }
+    try {
+      remote = std::make_unique<RemoteRobot>(*t);   // hello() throws on version mismatch
+    } catch (const RobotLinkError& ex) {
+      pf::log(pf::Level::Error, "robot handshake(%s) failed: %s", robot_path.c_str(), ex.what());
+      return false;
+    }
+    transport = std::move(t);
+    return true;
+  };
+
+  // Reconnect after a link loss: retry every 200 ms, heartbeat still beating, honour quit.
+  auto wait_robot = [&]() -> bool {
+    for (;;) {
+      if (connect_remote()) return true;
+      for (int k = 0; k < 20; ++k) {
+        if (S.quit.load()) return false;
+        heartbeat_if_due();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+    }
+  };
+
+  if (robot_mode) {
+    if (!wait_robot()) { pf::log(pf::Level::Error, "no robot driver at %s; exit", robot_path.c_str()); return 1; }
+    { std::lock_guard<std::mutex> g(S.mu); S.robot_desc = robot_path; }
+  }
 
   for (int n = 0; (episodes <= 0 || n < episodes) && !S.quit; ++n) {
     while (true) { { std::lock_guard<std::mutex> g(S.mu); if (!S.paused || S.quit) break; } timer.wait_tick(); ctl.publish(); heartbeat_if_due(); }
@@ -235,42 +298,94 @@ int main(int argc, char** argv) {
       if (S.force_fault >= 0) sc.force_fault = S.force_fault;
       arm = S.arm;
     }
-    PushSim2D sim(ep, sc);
-    robot.sim = &sim;
-    ScriptedPushPolicy pol(ecfg.policy_bias_std);
-    pol.new_episode(ep);
-    MiddlewareConfig mc;
-    mc.max_retries = arm == "none" ? 0 : 3;
-    mc.seed = ep;
-    RetryPolicy* rp = arm == "mw" ? (RetryPolicy*)&lib : (RetryPolicy*)&naive;
-    {
-      std::lock_guard<std::mutex> g(S.mu);
-      S.cur_ep = ep; S.cur_fault = to_string(sim.fault());
-      push_event("EPISODE " + std::to_string(ep) + " start arm=" + arm + " fault=" + S.cur_fault);
+    EpisodeReport rep;
+    bool gt = false;
+    Fault fault = Fault::None;
+    long sim_ticks = 0;
+    bool done = false;
+    // The failure library learns DURING an episode. If the driver dies mid-episode, the re-run of the same seed must
+    // start from the library as it was before the lost attempt, otherwise remote and in-process runs diverge.
+    const auto lib_before = lib.lib;
+    while (!done && !S.quit) {
+      // Bind this episode's robot source: the in-process simulator, or a fresh Reset on the driver.
+      std::unique_ptr<PushSim2D> sim;                 // local mode only
+      RobotAdapter* dev = nullptr;
+      TruthSensor* truth = nullptr;
+      try {
+        if (robot_mode) {
+          fault = remote->reset(static_cast<std::uint64_t>(ep), sc);
+          dev = remote.get();
+          truth = remote.get();
+        } else {
+          sim = std::make_unique<PushSim2D>(ep, sc);
+          fault = sim->fault();
+          dev = sim.get();
+          truth = sim.get();
+        }
+        robot.bind(*dev,
+                   [&, robot_mode] {
+                     if (robot_mode) remote->knock(0, Vec2{0.0, -0.10});
+                     else sim->knock(0, Vec2{0.0, -0.10});
+                     push_event("CTL knock: cube A displaced 10 cm");
+                   },
+                   [&, robot_mode]() -> long {
+                     return robot_mode ? remote->last_ticks() : sim->ticks();
+                   });
+        ScriptedPushPolicy pol(ecfg.policy_bias_std);
+        pol.new_episode(ep);
+        MiddlewareConfig mc;
+        mc.max_retries = arm == "none" ? 0 : 3;
+        mc.seed = ep;
+        RetryPolicy* rp = arm == "mw" ? (RetryPolicy*)&lib : (RetryPolicy*)&naive;
+        {
+          std::lock_guard<std::mutex> g(S.mu);
+          S.cur_ep = ep; S.cur_fault = to_string(fault);
+          push_event("EPISODE " + std::to_string(ep) + " start arm=" + arm + " fault=" + S.cur_fault);
+        }
+        // Reviewer fix: the middleware must drive the RealtimeRobot wrapper (timer pacing, latency histogram, knock,
+        // heartbeat), never the raw device; T8 had passed *dev here, which silently bypassed the real-time loop.
+        ReliabilityMiddleware mw(pol, robot, rp, mc, [&](const Event& e) {
+          char line[256];
+          std::snprintf(line, sizeof line, "ep=%d tick=%ld %s %s attempt=%d strategy=%s mode=%s%s", ep, robot.robot_ticks(), to_string(e.type),
+                        e.subtask.c_str(), e.attempt, e.strategy.c_str(), to_string(e.mode), e.correlated ? " (correlated)" : "");
+          pf::log(e.type == EventType::Escalate ? pf::Level::Warn : pf::Level::Info, "%s", line);
+          std::lock_guard<std::mutex> g(S.mu);
+          if (!e.subtask.empty()) S.cur_subtask = e.subtask;
+          S.cur_attempt = e.attempt;
+          if (!e.strategy.empty()) S.cur_strategy = e.strategy;
+          push_event(line);
+        });
+        auto task = make_task(*truth, ep);
+        rep = mw.run(task);
+        gt = true;
+        for (int i = 0; i < kNumObjects; ++i) gt = gt && oracle_verdict(truth->truth(), i).ok;
+        sim_ticks = robot.robot_ticks();
+        done = true;
+      } catch (const RobotLinkError& e) {
+        // Process-level recovery: the driver process died with the robot state. Do not count the episode,
+        // reconnect, and re-run the SAME episode seed from the start (task-level recovery is the
+        // middleware's own rollback/retry, which stays untouched).
+        pf::log(pf::Level::Error, "robot link lost: %s", e.what());
+        {
+          std::lock_guard<std::mutex> g(S.mu);
+          push_event("ROBOT LINK LOST");
+          ++S.robot_link_errors;
+        }
+        lib.lib = lib_before;       // undo what the lost attempt taught the library
+        remote.reset();
+        transport.reset();
+        if (!wait_robot()) break;   // quit during reconnect
+      }
     }
-    ReliabilityMiddleware mw(pol, robot, rp, mc, [&](const Event& e) {
-      char line[256];
-      std::snprintf(line, sizeof line, "ep=%d tick=%ld %s %s attempt=%d strategy=%s mode=%s%s", ep, sim.ticks(), to_string(e.type),
-                    e.subtask.c_str(), e.attempt, e.strategy.c_str(), to_string(e.mode), e.correlated ? " (correlated)" : "");
-      pf::log(e.type == EventType::Escalate ? pf::Level::Warn : pf::Level::Info, "%s", line);
-      std::lock_guard<std::mutex> g(S.mu);
-      if (!e.subtask.empty()) S.cur_subtask = e.subtask;
-      S.cur_attempt = e.attempt;
-      if (!e.strategy.empty()) S.cur_strategy = e.strategy;
-      push_event(line);
-    });
-    auto task = make_task(sim, ep);
-    EpisodeReport rep = mw.run(task);
-    bool gt = true;
-    for (int i = 0; i < kNumObjects; ++i) gt = gt && oracle_verdict(sim.true_state(), i).ok;
+    if (S.quit) break;
     {
       std::lock_guard<std::mutex> g(S.mu);
       ++S.episodes; S.success += gt; S.recovered += (gt && rep.n_failures() > 0);
       S.failures_detected += rep.n_failures() > 0; S.escalated += rep.abort_reason == "escalate_to_operator";
       push_event("EPISODE " + std::to_string(ep) + (gt ? " SUCCESS" : " FAILED (" + rep.abort_reason + ")"));
     }
-    pf::log(pf::Level::Info, "episode %d fault=%s arm=%s -> %s (failures=%d, ticks=%ld)", ep, to_string(sim.fault()), arm.c_str(),
-            gt ? "SUCCESS" : "FAILED", rep.n_failures(), sim.ticks());
+    pf::log(pf::Level::Info, "episode %d fault=%s arm=%s -> %s (failures=%d, ticks=%ld)", ep, to_string(fault), arm.c_str(),
+            gt ? "SUCCESS" : "FAILED", rep.n_failures(), sim_ticks);
     if (!library.empty() && arm == "mw") {  // persist the failure library atomically: tmp write + rename
       const std::string tmp = library + ".tmp";
       if (!lib.save(tmp)) pf::log(pf::Level::Warn, "failed to save failure library to %s", tmp.c_str());

@@ -2,6 +2,7 @@
 // Copyright (c) 2026 elidot
 // Subtask verifiers. The middleware only sees Verdicts; ground truth is never used for decisions.
 #pragma once
+#include "relmw/robot.hpp"
 #include "relmw/sim2d.hpp"
 
 namespace relmw {
@@ -15,13 +16,14 @@ FailureMode classify(Vec2 obj, Vec2 pusher, Vec2 goal);
 
 // Independent "overhead camera" verifier: its own object estimate (true pose + N(0, sigma) noise),
 // unaffected by the policy's perception faults. Noise stream is seeded per episode for determinism.
+// Reads ground truth through the TruthSensor interface (in-process sim or remote driver process).
 class CameraVerifier {
  public:
-  CameraVerifier(const PushSim2D* sim, int obj, std::uint64_t seed, double sigma = 0.003)
-      : sim_(sim), obj_(obj), rng_(seed), sigma_(sigma) {}
+  CameraVerifier(TruthSensor* truth, int obj, std::uint64_t seed, double sigma = 0.003)
+      : truth_(truth), obj_(obj), rng_(seed), sigma_(sigma) {}
   Verdict operator()(const Obs&);
  private:
-  const PushSim2D* sim_;
+  TruthSensor* truth_;
   int obj_;
   Rng rng_;
   double sigma_;

@@ -26,6 +26,15 @@ struct Perturb {
   int retry = 0;
 };
 
+// Ground-truth "overhead camera" sensor: the world as it really is, independent of the robot's
+// own perception. PushSim2D implements it in-process; a driver process (relmw_robotd) implements
+// it over the robot link, which is why truth() is non-const (a remote implementation does IPC).
+class TruthSensor {
+ public:
+  virtual ~TruthSensor() = default;
+  virtual Obs truth() = 0;
+};
+
 struct SubtaskMeta {
   int object = 0;              // index into Obs::obj
   Vec2 goal_xy;
