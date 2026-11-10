@@ -33,6 +33,9 @@ On QNX it runs as a **real-time supervisor process**:
 | **slog2** event log (`slog2info -b relmw`) | `src/platform/qnx/qnx_log.cpp` |
 | **SCHED_FIFO / SCHED_SPORADIC** control thread | `qnx_timer.cpp` `set_thread_sched()` |
 | **High Availability Manager**: restart on death; heartbeat entity whose missed-heartbeat condition kills a hung process so the restart takes over; failure library saved atomically and reloaded | `apps/relmw_ham_setup.cpp`, `qnx_timer.cpp` `watchdog_attach()`, `apps/relmw_supervisor.cpp` |
+| **Robot driver as its own resource manager** `/dev/robot0`: fixed-size `_IO_MSG` requests over `MsgSend`/`MsgReply`; if the driver dies the supervisor reconnects and re-runs the episode (process-level recovery on top of task-level rollback) | `src/platform/qnx/qnx_robot_link.cpp`, `apps/relmw_robotd.cpp`, `src/core/robot_link.cpp` |
+| **CPU affinity** of the control thread by cluster (`--cpu N` / `--cluster NAME`: `pthread_cluster_set`, runmask read back with `ThreadCtl`) | `qnx_timer.cpp` `set_thread_cluster()` |
+| **Security policy** draft (least privilege per process type) + host-side lint | `config/secpol/relmw_secpol.txt`, `docs/secpol.md`, `tools/secpol_lint.py` |
 | Release-latency histogram (p50/p99/max, deadline misses) | `src/platform/latency.cpp`, `relmw_supervisor --report` |
 
 ## Results so far (Linux host, simulation only)
@@ -64,12 +67,14 @@ Sources: `results/host_linux/rt_report_sched_other_1khz*.json`; all results in o
 
 ## Build and run (Linux host)
 ```bash
-scripts/build_host.sh                     # CMake + Ninja, then ctest (12 tests, zero warnings with g++ 14.2)
+scripts/build_host.sh                     # CMake + Ninja, then ctest (18 tests, zero warnings with g++ 14.2)
 build-host/relmw_bench --n 100 --out results/host_linux
 build-host/relmw_supervisor --episodes 0 --period-us 1000 --sched other --mount /tmp/relmw --library /tmp/lib.txt &
 scripts/relmwctl -m /tmp/relmw status
 scripts/relmwctl -m /tmp/relmw fault percep_bias      # prints "OK fault percep_bias"
 scripts/relmwctl -m /tmp/relmw events 10
+scripts/relmwctl -m /tmp/relmw plan push_B,push_A    # subtask order from the next episode ("OK plan push_B,push_A")
+python3 tools/llm_assist.py plan "push the blue cube first, then the red one"   # host-side LLM, falls back offline
 scripts/relmwctl -m /tmp/relmw quit
 python3 tools/make_dashboard.py --host results/host_linux --out docs/dashboard.html
 ```
@@ -77,8 +82,9 @@ python3 tools/make_dashboard.py --host results/host_linux --out docs/dashboard.h
 Tests (`ctest`): unit tests for rng, stats, sim2d, middleware, retry_policy, latency, POSIX platform,
 end-to-end experiment (70 cases), a real-time no-allocation test (`test_rt_noalloc`: record/step/get_obs/
 wait_tick/now_ns allocate nothing; a whole episode allocates 0.04 times per tick, only at sub-task boundaries),
-a supervisor end-to-end test (control surface, `relmwctl`, library survives a restart), the QNX syntax check,
-and the dashboard tests.
+a supervisor end-to-end test (control surface, `relmwctl`, `--cpu 0`, `plan`, library survives a restart),
+the robot-link tests (protocol layout, remote == in-process for 30 seeds x 3 arms, `relmw_robotd` crash recovery),
+CPU-affinity and plan unit tests, the QNX syntax check, and the dashboard / LLM-assistant / secpol-lint tests.
 
 ## QNX code checks available before the SDP
 ```bash

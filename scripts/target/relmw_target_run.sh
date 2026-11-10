@@ -121,7 +121,7 @@ if [ "${NCPU:-1}" -ge 2 ]; then
   step 81_sup_fifo_load_cpu1 "$BIN/relmw_supervisor" --episodes 30 --period-us 1000 --sched fifo --prio 40 --cpu 1 \
         --mount /dev/relmw_cpu1 --library "$OUT/lib_cpu1.txt" --report "$OUT/rt_report_fifo_load_cpu1.json"
   for p in $LOADPIDS; do stop_pid "$p"; done
-  grep -q '^control_affinity=_cpu-1' "$OUT/81_sup_fifo_load_cpu1.txt" && ok 82_affinity_applied || bad 82_affinity_applied
+  grep -q '^control_affinity=_cpu-1 cpus=1 mask=0x2$' "$OUT/81_sup_fifo_load_cpu1.txt" && ok 82_affinity_applied || bad 82_affinity_applied
 else
   note "80: only ${NCPU:-1} CPU(s) in this VM: affinity run skipped (boot QEMU with >= 2 vCPUs)"
 fi
