@@ -16,6 +16,8 @@ typedef struct _resmgr_attr {
   unsigned flags; unsigned nparts_max; size_t msg_max_size; int (*other_func)(resmgr_context_t*, void* msg); unsigned reserved[4];
 } resmgr_attr_t;
 #define _RESMGR_NPARTS(n) (-(n))
+#define _RESMGR_NOREPLY (-2)
+#define _RESMGR_STATUS(ctp, status) ((ctp)->status = (status))
 #define _RESMGR_DETACH_ALL 0x0000u
 #define _RESMGR_DETACH_PATHNAME 0x0001u
 #define _RESMGR_FLAG_DIR 0x0100u

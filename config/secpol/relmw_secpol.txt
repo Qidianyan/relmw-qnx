@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 elidot
+#
+# relmw: least-privilege security policy for QNX SDP 8.0 (security policy language,
+# System Security Guide > "Security policy language"). DRAFT: written from the 8.0 documentation, not yet
+# compiled with secpolcompile nor pushed on a target (see docs/secpol.md, "Validation").
+#
+# Compile (host, SDP 8.0):  secpolcompile -o secpol.bin config/secpol/relmw_secpol.txt   (add -m while iterating)
+# Start (target startup script, after secpolpush):
+#   on -T relmw_robotd_t     -u 1001:1001 /usr/bin/relmw_robotd --path /dev/robot0 &
+#   on -T relmw_supervisor_t -u 1001:1001 /usr/bin/relmw_supervisor --robot /dev/robot0 --cpu 1 ...
+#   on -T relmw_operator_t   -u 1002:1002 /usr/bin/relmwctl status
+#
+# Types provided by the rest of the system. Their names depend on the image's own policy (check with
+# `secpolgenerate` / the policy shipped with the image) and must be adjusted before compiling:
+# extern: slogger2_t ham_t
+
+type relmw_supervisor_t;     # real-time supervisor: control loop + /dev/relmw resource manager
+type relmw_robotd_t;         # robot driver process: /dev/robot0 resource manager (_IO_MSG request/reply)
+type relmw_operator_t;       # operator tools: relmwctl, cat/echo on /dev/relmw, tools/llm_assist.py plans via ssh
+
+# --- path space: each process may register exactly its own names, nothing else ------------------------------
+allow_attach relmw_supervisor_t {
+    /dev/relmw/status
+    /dev/relmw/events
+    /dev/relmw/ctl
+};
+allow_attach relmw_robotd_t /dev/robot0;
+
+# --- process-manager abilities -------------------------------------------------------------------------------
+# pathspace      : resmgr_attach() needs it (privileged; granted to the non-root uid 1001 via `nonroot`).
+# public_channel : dispatch_create() creates a public channel (non-privileged, listed explicitly for clarity).
+# NOT granted on purpose: priority (control thread runs at 40 <= 63, the unprivileged maximum; add priority:64-<n>
+# only if --prio > 63), io, interrupt, mem_phys, mem_lock, spawn, setuid, settypeid, signal, xprocess_*,
+# high_resolution_timer (we never shrink timer tolerance), able_priv, unlock.
+allow relmw_supervisor_t self:ability {
+    nonroot
+    pathspace
+    public_channel
+};
+allow relmw_robotd_t self:ability {
+    nonroot
+    pathspace
+    public_channel
+};
+
+# --- who may connect to whom (QNX message passing is the only way in) ----------------------------------------
+# Channels inherit the type of their owner. A process may ConnectAttach()/open() a channel only if allowed here, so
+# POSIX permissions on /dev/relmw/ctl (0666) are a second line of defence; the first is this list.
+allow relmw_supervisor_t relmw_robotd_t:channel connect;             # MsgSend() robot requests
+allow relmw_operator_t   relmw_supervisor_t:channel connect;         # cat /dev/relmw/status, echo > /dev/relmw/ctl
+allow relmw_operator_t   relmw_robotd_t:channel connect;             # cat /dev/robot0 (read-only status)
+allow { relmw_supervisor_t relmw_robotd_t } slogger2_t:channel connect;   # slog2 buffers
+allow relmw_supervisor_t ham_t:channel connect;                      # ham_attach_self / ham_heartbeat / ham_condition

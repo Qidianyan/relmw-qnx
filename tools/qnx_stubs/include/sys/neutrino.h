@@ -19,6 +19,8 @@ typedef struct iovec iov_t;
 #define _NTO_CHF_THREAD_DEATH 0x0004u
 #define _NTO_CHF_DISCONNECT 0x0008u
 #define _NTO_CHF_PRIVATE 0x0080u
+#define _NTO_CHF_COID_DISCONNECT 0x0040u
+#define _NTO_CHF_INHERIT_RUNMASK 0x0200u
 #define _NTO_SIDE_CHANNEL 0x40000000u
 #define SYSMGR_COID _NTO_SIDE_CHANNEL
 #define _NTO_REGEVENT_ALLOW_ANY_SERVER (-1)
@@ -28,6 +30,12 @@ int ConnectAttach(uint32_t reserved, pid_t pid, int chid, unsigned index, int fl
 int ConnectDetach(int coid);
 int MsgReceivePulse(int chid, void* pulse, size_t bytes, struct _msg_info* info);
 int MsgSendPulse(int coid, int priority, int code, long value);
+long MsgSend(int coid, const void* smsg, size_t sbytes, void* rmsg, size_t rbytes);
+int MsgReply(rcvid_t rcvid, long status, const void* msg, size_t bytes);
+int MsgError(rcvid_t rcvid, int error);
+int ThreadCtl(int cmd, void* data);
+#define _NTO_TCTL_RUNMASK 4
+#define _NTO_TCTL_RUNMASK_GET_AND_SET 6
 int MsgRegisterEvent(struct sigevent* event, int coid);
 int MsgUnregisterEvent(const struct sigevent* event);
 #ifdef __cplusplus

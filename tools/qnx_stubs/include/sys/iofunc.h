@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/resmgr.h>
+#include <sys/iomsg.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -43,7 +44,7 @@ typedef struct _resmgr_io_funcs {
   __RMIO(read, io_read_t); __RMIO(write, io_write_t); __RMIO(close_ocb, void); __RMIO(stat, void); __RMIO(notify, void);
   __RMIO(devctl, void); __RMIO(unblock, void); __RMIO(pathconf, void); __RMIO(lseek, void); __RMIO(chmod, void);
   __RMIO(chown, void); __RMIO(utime, void); __RMIO(openfd, void); __RMIO(fdinfo, void); __RMIO(lock, void);
-  __RMIO(space, void); __RMIO(shutdown, void); __RMIO(mmap, void); __RMIO(msg, void); __RMIO(reserved, void);
+  __RMIO(space, void); __RMIO(shutdown, void); __RMIO(mmap, void); __RMIO(msg, io_msg_t); __RMIO(reserved, void);
   __RMIO(dup, void); __RMIO(close_dup, void); __RMIO(lock_ocb, void); __RMIO(unlock_ocb, void); __RMIO(sync, void);
   __RMIO(power, void); __RMIO(acl, void); __RMIO(pause, void); __RMIO(unpause, void);
   __RMIO(read64, io_read_t); __RMIO(write64, io_write_t); __RMIO(notify64, void); __RMIO(utime64, void); __RMIO(check_msg, void);
