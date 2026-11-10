@@ -73,7 +73,7 @@ install(TARGETS relmw_bench relmw_supervisor DESTINATION bin)
 
 # ---- tests (ctest) ----------------------------------------------------------
 enable_testing()
-foreach(t test_rng test_stats test_sim2d test_middleware test_retry_policy test_latency test_posix_platform test_experiment)
+foreach(t test_rng test_stats test_sim2d test_middleware test_retry_policy test_latency test_posix_platform test_experiment test_rt_noalloc)
   if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/${t}.cpp)
     add_executable(${t} tests/${t}.cpp)
     target_link_libraries(${t} relmw_platform)
