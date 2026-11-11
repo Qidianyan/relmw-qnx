@@ -157,7 +157,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-app
 .btn:hover{border-color:#CFCAC0}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .btn.primary:hover{background:#A9380A}
-.status{font-size:12px;color:var(--ok);min-height:1em}
+.status{font-size:12px;color:var(--ok);margin:0}.status:empty{display:none}
 .wrap{max-width:1320px;margin:0 auto;padding:20px 24px 48px;display:grid;grid-template-columns:200px minmax(0,1fr);gap:32px}
 nav.index{position:sticky;top:96px;align-self:start;font-size:13px}
 nav.index ol{list-style:none;margin:0;padding:0;border-left:1px solid var(--line)}
@@ -182,10 +182,18 @@ h1{font-size:22px;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
 .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 8px}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
 .kpi .k{display:flex;align-items:center;gap:6px;font:600 11px/1.2 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
-.kpi .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:28px;font-weight:600;margin:8px 0 2px;letter-spacing:-.02em}
+.kpi .v{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-variant-numeric:tabular-nums lining-nums;font-size:32px;font-weight:650;margin:10px 0 4px;letter-spacing:-.025em;line-height:1.1}
 .kpi .v.acc{color:var(--accent)}
 .kpi .s{font-size:12px;color:var(--ink-2)}
-.kpi .s b{font-family:var(--mono);font-weight:600;color:var(--ink)}
+.kpi .s b{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
+.hero{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;padding:8px 0 14px}
+.eyebrow{display:flex;align-items:center;gap:8px;margin:0;font:600 12px/1.2 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.hero h1{font-size:40px;line-height:1.1;font-weight:700;letter-spacing:-.03em;margin:6px 0 4px;max-width:30ch;font-variant-numeric:tabular-nums}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero .sub{font-size:16px;color:var(--ink-2);margin:0;max-width:62ch}
+.hero .sub b{color:var(--ink);font-variant-numeric:tabular-nums}
+nav.index a[aria-current=true]{color:var(--ink);font-weight:600;border-left-color:var(--accent)}
+nav.index a[aria-current=true] .n{color:var(--accent)}
 section{margin-top:28px}
 h2{display:flex;align-items:center;gap:8px;font:600 14px/1.2 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;margin:0 0 10px;color:var(--ink)}
 h2 .n{font-family:var(--mono);color:var(--accent)}
@@ -240,7 +248,7 @@ footer p{margin:4px 0}
 @media (max-width:1099px){.wrap{grid-template-columns:minmax(0,1fr)}nav.index{display:none}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
  .grid2{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:640px){.top{position:static}.top-in{padding:10px 14px}.wrap{padding:16px 14px 40px}.kpis{grid-template-columns:minmax(0,1fr)}
- .actions{margin-left:0;width:100%}.chartwrap{overflow-x:auto}.brow,.bars-h{grid-template-columns:96px minmax(0,1fr) 56px;gap:8px}.bl{font-size:12px}.chartwrap svg.chart{min-width:600px}.btn .lbl-long{display:none}.hint{display:block}.kpi .v{font-size:24px}
+ .actions{margin-left:0;width:100%}.chartwrap{overflow-x:auto}.brow,.bars-h{grid-template-columns:96px minmax(0,1fr) 56px;gap:8px}.bl{font-size:12px}.chartwrap svg.chart{min-width:600px}.btn .lbl-long{display:none}.hint{display:block}.kpi .v{font-size:26px}.hero h1{font-size:30px}.hero .sub{font-size:15px}
  footer{padding:16px 14px 32px}}
 @media print{.top,.controls,nav.index,.skip,.hint,.fallback{display:none!important}body{background:#fff}
  .wrap{display:block;padding:0}.card,.kpi{border-color:#ccc}section{break-before:page}section:first-of-type{break-before:auto}
@@ -517,6 +525,24 @@ def provenance_section(summary, inputs):
     return "".join(out)
 
 
+def hero(summary, now):
+    field = (summary.get("conditions") or {}).get("field") or {}
+    mw, nv, sp = (field.get(k) or {} for k in ARM_KEYS[::-1])
+    n = raw(summary, "N_per_arm")
+    if num(mw.get("success")) and num(mw.get("N")):
+        head = (f'relmw recovers <em>{fmt_int(mw.get("success"))} of {fmt_int(mw.get("N"))}</em> '
+                'fault&#8209;injected robot episodes')
+    else:
+        head = "Reliability supervisor results"
+    sub = (f'Same faults, same seeds: no middleware <b>{fmt_int(sp.get("success"))}</b>, naive retry '
+           f'<b>{fmt_int(nv.get("success"))}</b>. QNX 8.0 numbers appear only after the first QEMU run.')
+    return ('<section class="hero" aria-labelledby="h-hero">'
+            f'<p class="eyebrow">{icon("flask")} Simulation · {fmt_int(n)} paired episodes per arm · not a physical robot</p>'
+            f'<h1 id="h-hero">{head}</h1><p class="sub">{sub}</p>'
+            f'<p class="meta">Generated <span class="mono">{esc(now)}</span> · failure library: '
+            f'{fmt_int(raw(summary, "library_entries"))} entries</p></section>')
+
+
 def kpis(summary, host_reports):
     field = (summary.get("conditions") or {}).get("field") or {}
     mw, nv, sp = (field.get(k) or {} for k in ARM_KEYS[::-1])
@@ -686,6 +712,17 @@ document.getElementById('a-png').addEventListener('click', exportPng);
 document.getElementById('a-print').addEventListener('click', function(){ window.print(); });
 document.querySelectorAll('nav.index a').forEach(function(a){ a.addEventListener('click', function(){
   try { history.replaceState(null, '', url() + '&sec=' + a.getAttribute('href').slice(1)); } catch (e) {} }); });
+var navA = document.querySelectorAll('nav.index a');
+if ('IntersectionObserver' in window && navA.length) {
+  var vis = {};
+  var io = new IntersectionObserver(function(es){
+    es.forEach(function(e){ vis[e.target.id] = e.isIntersecting; });
+    var cur = null;
+    navA.forEach(function(a){ var id = a.getAttribute('href').slice(1); if (!cur && vis[id]) cur = id; });
+    if (cur) navA.forEach(function(a){ a.setAttribute('aria-current', String(a.getAttribute('href') === '#' + cur)); });
+  }, {rootMargin: '-120px 0px -55% 0px'});
+  navA.forEach(function(a){ var el = document.getElementById(a.getAttribute('href').slice(1)); if (el) io.observe(el); });
+}
 apply();
 if (sec && /^[a-z]+$/.test(sec) && document.getElementById(sec)) {
   try { history.replaceState(null, '', url() + '&sec=' + sec); } catch (e) {}
@@ -758,15 +795,11 @@ def build(host_dir, qnx_dir, sim_dir=None):
              '<li><a href="#realtime"><span class="n">03</span>Real-time</a></li>'
              '<li><a href="#provenance"><span class="n">04</span>Provenance</a></li></ol></nav>')
     b.append('<main id="results" tabindex="-1">')
-    b.append('<h1>Reliability supervisor results</h1>')
-    b.append(f'<p class="lede">{esc(label)}. Not a physical robot. QNX 8.0 numbers appear only after the first run '
-             'in QEMU; nothing here is estimated.</p>')
-    b.append(f'<p class="meta">Generated <span class="mono">{esc(now)}</span> · '
-             f'{fmt_int(raw(summary, "N_per_arm"))} paired episodes per arm · '
-             f'failure library: {fmt_int(raw(summary, "library_entries"))} entries</p>')
+    b.append(hero(summary, now))
     b.append('<p id="status" class="status" role="status" aria-live="polite"></p>'
              '<div id="fallback" class="fallback"><label class="note" for="fb-url">Link to this view</label><br>'
              '<input id="fb-url" readonly></div>')
+    b.append(kpis(summary, host_reports))
     b.append('<div class="controls" aria-label="View"><div class="grp"><span class="lab">Condition</span>'
              '<div class="seg" role="group" aria-label="Condition">'
              + "".join(f'<button type="button" data-set-cond="{ck}" aria-pressed="{str(ck == "field").lower()}">'
@@ -776,7 +809,6 @@ def build(host_dir, qnx_dir, sim_dir=None):
                        f'<span class="sw" style="background:{ARM_COLOR[k]}"></span>{esc(ARM_LABEL[k])}</label>'
                        for k in ARM_KEYS)
              + '</div></div>')
-    b.append(kpis(summary, host_reports))
     b.append(success_section(summary))
     b.append(fault_section(summary))
     b.append(rt_section(host_dir, host_reports, qnx_dir, qnx_reports, qnx_has_json, sim_dir, sim_reports))

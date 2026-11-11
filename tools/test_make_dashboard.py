@@ -126,6 +126,18 @@ class DashboardTest(unittest.TestCase):
             self.assertIn("1.9e-06", page)          # McNemar p corr_aware vs single_pass, as in summary.json
             self.assertIn(">262.1<", page)          # host p99 (SCHED_OTHER 1 kHz)
 
+    def test_hero_and_kpi_typography(self):
+        with tempfile.TemporaryDirectory() as td:
+            page = self.run_gen(os.path.join(td, "d.html"))
+            self.assertIn("relmw recovers <em>98 of 100</em>", page)
+            self.assertRegex(page, r'class="eyebrow">.*Simulation')
+            self.assertLess(page.index('class="hero"'), page.index('class="kpis"'))
+            self.assertLess(page.index('class="kpis"'), page.index('class="controls"'))
+            kv = re.search(r"\.kpi \.v\{([^}]*)\}", page).group(1)
+            self.assertNotIn("var(--mono)", kv)
+            self.assertIn("tabular-nums", kv)
+            self.assertIn("aria-current", page)
+
     def test_only_vendored_phosphor_icons(self):
         icon_dir = os.path.join(ROOT, "tools", "dashboard_assets", "phosphor", "regular")
         vendored = set()
