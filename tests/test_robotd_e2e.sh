@@ -38,10 +38,12 @@ start_robotd() {   # $1 = socket path, $2 = extra args (may be empty)
   PIDS="$PIDS $!"
 }
 
+# RELMW_PROBE_PREFIX: under the QNX API simulation (tests/qnx_sim/test_sim_e2e.sh) the driver path is a simulated
+# resmgr path whose socket lives at $QNXSIM_ROOT<path>; the prefix makes wait_sock look there.
 wait_sock() {   # up to 10 s for the SEQPACKET socket file
   i=0
-  while [ ! -S "$1" ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
-  [ -S "$1" ] || fail "robotd socket $1 did not appear within 10 s"
+  while [ ! -S "${RELMW_PROBE_PREFIX:-}$1" ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+  [ -S "${RELMW_PROBE_PREFIX:-}$1" ] || fail "robotd socket $1 did not appear within 10 s"
 }
 
 # Print the first line of $1 matching $2 (fail if absent) into stdout.

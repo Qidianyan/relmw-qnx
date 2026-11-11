@@ -38,12 +38,25 @@ done
 cmd=${1:-}
 arg=${2:-}
 
+# QNX API simulation on Linux (not QNX): with RELMW_QNX_SIM=1, a mount served by the simulated resource manager
+# (compat/qnx_sim) is a socket under $QNXSIM_ROOT; reads/writes go through qnxsim_io (= cat / echo on QNX).
+SIM_IO=
+if [ "${RELMW_QNX_SIM:-0}" = 1 ]; then
+  sim_root=${QNXSIM_ROOT:-/tmp/qnxsim-$(id -u)}
+  if [ -S "$sim_root$DIR/status" ]; then
+    SIM_IO=${QNXSIM_IO:-$(command -v qnxsim_io 2>/dev/null)}
+    [ -n "$SIM_IO" ] || { echo "relmwctl: RELMW_QNX_SIM=1 but qnxsim_io not found (set QNXSIM_IO)" >&2; exit 1; }
+  fi
+fi
+rd() { if [ -n "$SIM_IO" ]; then "$SIM_IO" read "$1"; else cat "$1"; fi; }
+wr() { if [ -n "$SIM_IO" ]; then "$SIM_IO" write "$1" "$2"; else printf '%s\n' "$2" > "$1"; fi; }
+
 # Send "<line>" to DIR/ctl and print the reply. POSIX host (FIFO ctl): the reply lands in DIR/reply;
 # wait up to ~2 s for it to change (content or mtime) before printing. QNX resmgr: the reply to the
 # last command is read back with cat DIR/ctl.
 send_cmd() {
   line=$1
-  if [ -p "$DIR/ctl" ]; then
+  if [ -z "$SIM_IO" ] && [ -p "$DIR/ctl" ]; then
     reply=$DIR/reply
     old=$(cat "$reply" 2>/dev/null)
     marker=$(mktemp 2>/dev/null) || marker=
@@ -69,11 +82,11 @@ send_cmd() {
       *)   return 1;;
     esac
   else
-    if ! printf '%s\n' "$line" > "$DIR/ctl"; then
+    if ! wr "$DIR/ctl" "$line"; then
       echo "relmwctl: cannot write $DIR/ctl" >&2
       exit 1
     fi
-    out=$(cat "$DIR/ctl" 2>/dev/null)
+    out=$(rd "$DIR/ctl" 2>/dev/null)
     printf '%s\n' "$out"
     case $out in
       OK*) return 0;;
@@ -84,7 +97,7 @@ send_cmd() {
 
 case $cmd in
   status)
-    cat "$DIR/status"
+    rd "$DIR/status"
     exit $?;;
   events)
     if [ $# -gt 2 ]; then usage; exit 2; fi
@@ -92,7 +105,7 @@ case $cmd in
     case $n in
       ''|*[!0-9]*) echo "relmwctl: events: N must be a number" >&2; usage; exit 2;;
     esac
-    tail -n "$n" "$DIR/events"
+    rd "$DIR/events" | tail -n "$n"
     exit $?;;
   watch)
     secs=${arg:-1}
@@ -100,7 +113,7 @@ case $cmd in
       ''|*[!0-9]*) echo "relmwctl: watch: SECONDS must be a number" >&2; usage; exit 2;;
     esac
     while :; do
-      cat "$DIR/status"
+      rd "$DIR/status"
       sleep "$secs"
     done;;
   fault|plan|arm)

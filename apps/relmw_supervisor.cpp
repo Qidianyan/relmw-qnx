@@ -68,7 +68,9 @@ struct Shared {
 Shared S;
 
 const char* platform_name() {
-#ifdef __QNX__
+#if defined(RELMW_QNX_SIM)
+  return "QNX API simulation on Linux (not QNX)";
+#elif defined(__QNX__)
   return "QNX";
 #else
   return "POSIX host";

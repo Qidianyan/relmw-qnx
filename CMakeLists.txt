@@ -17,9 +17,34 @@ if(CMAKE_SYSTEM_NAME STREQUAL "QNX")
 else()
   set(RELMW_QNX OFF)
 endif()
-message(STATUS "relmw: target system = ${CMAKE_SYSTEM_NAME} (QNX layer: ${RELMW_QNX})")
+# RELMW_QNX_SIM=ON (Linux only): build the QNX platform layer (src/platform/qnx, compiled with __QNX__) against
+# compat/qnx_sim, a user-space simulation of the QNX API subset it uses. QNX API simulation on Linux, not QNX:
+# it tests logic and backs the codelab; it says nothing about QNX timing, scheduling or security.
+option(RELMW_QNX_SIM "Build the QNX layer against the QNX API simulation on Linux (not QNX)" OFF)
+if(RELMW_QNX_SIM AND RELMW_QNX)
+  message(FATAL_ERROR "RELMW_QNX_SIM is for Linux hosts; a real QNX build uses the QNX toolchain file")
+endif()
+if(RELMW_QNX OR RELMW_QNX_SIM)
+  set(RELMW_QNX_LAYER ON)
+else()
+  set(RELMW_QNX_LAYER OFF)
+endif()
+message(STATUS "relmw: target system = ${CMAKE_SYSTEM_NAME} (QNX layer: ${RELMW_QNX_LAYER}, QNX API simulation: ${RELMW_QNX_SIM})")
 
 add_compile_options(-Wall -Wextra)
+if(RELMW_QNX_SIM)
+  add_compile_definitions(__QNX__ RELMW_QNX_SIM=1)
+  find_package(Threads REQUIRED)
+  set(QNX_SIM_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/compat/qnx_sim/include ${CMAKE_CURRENT_SOURCE_DIR}/tools/qnx_stubs/include)
+  add_library(qnx_sim STATIC compat/qnx_sim/src/qnx_sim.cpp)
+  target_include_directories(qnx_sim PRIVATE ${QNX_SIM_INCLUDES})
+  target_link_libraries(qnx_sim PUBLIC Threads::Threads)
+  foreach(tool qnxsim_io qnxsim_slog2info)
+    add_executable(${tool} compat/qnx_sim/tools/${tool}.cpp)
+    target_include_directories(${tool} PRIVATE ${QNX_SIM_INCLUDES})
+    target_link_libraries(${tool} qnx_sim)
+  endforeach()
+endif()
 
 # ---- portable core (no OS calls; identical on Linux and QNX) -------------
 add_library(relmw_core STATIC
@@ -37,14 +62,20 @@ add_library(relmw_core STATIC
 target_include_directories(relmw_core PUBLIC include)
 
 # ---- platform layer: POSIX (Linux host) or QNX-native ---------------------
-if(RELMW_QNX)
+if(RELMW_QNX_LAYER)
   add_library(relmw_platform STATIC
     src/platform/qnx/qnx_timer.cpp
     src/platform/qnx/qnx_log.cpp
     src/platform/qnx/qnx_resmgr.cpp
     src/platform/qnx/qnx_robot_link.cpp
     src/platform/latency.cpp)
-  target_link_libraries(relmw_platform PUBLIC relmw_core slog2)
+  if(RELMW_QNX_SIM)
+    # The QNX sources only: the simulated headers are PRIVATE so apps and the portable core never see them.
+    target_include_directories(relmw_platform PRIVATE ${QNX_SIM_INCLUDES})
+    target_link_libraries(relmw_platform PUBLIC relmw_core qnx_sim)
+  else()
+    target_link_libraries(relmw_platform PUBLIC relmw_core slog2)
+  endif()
 else()
   add_library(relmw_platform STATIC
     src/platform/posix/posix_timer.cpp
@@ -83,7 +114,7 @@ install(TARGETS relmw_bench relmw_supervisor DESTINATION bin)
 # ---- tests (ctest) ----------------------------------------------------------
 enable_testing()
 foreach(t test_rng test_stats test_sim2d test_middleware test_retry_policy test_latency test_posix_platform test_experiment test_rt_noalloc test_robot_link test_plan test_affinity)
-  if(RELMW_QNX AND t STREQUAL "test_posix_platform")
+  if(RELMW_QNX_LAYER AND t STREQUAL "test_posix_platform")
     continue()   # exercises the POSIX control surface (FIFO files); the QNX layer is covered by scripts/target/relmw_target_run.sh
   endif()
   if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/${t}.cpp)
@@ -93,7 +124,14 @@ foreach(t test_rng test_stats test_sim2d test_middleware test_retry_policy test_
   endif()
 endforeach()
 
-if(NOT RELMW_QNX)
+if(RELMW_QNX_SIM)
+  add_executable(test_qnx_sim tests/qnx_sim/test_qnx_sim.cpp)
+  target_include_directories(test_qnx_sim PRIVATE ${QNX_SIM_INCLUDES})
+  target_link_libraries(test_qnx_sim qnx_sim)
+  add_test(NAME test_qnx_sim COMMAND test_qnx_sim)
+  add_test(NAME test_sim_e2e COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/qnx_sim/test_sim_e2e.sh ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+  add_test(NAME test_sim_bench_identical COMMAND sh -c "$<TARGET_FILE:relmw_bench> --n 100 --out ${CMAKE_CURRENT_BINARY_DIR}/sim_bench >/dev/null && cmp ${CMAKE_CURRENT_BINARY_DIR}/sim_bench/episodes.jsonl ${CMAKE_CURRENT_SOURCE_DIR}/results/host_linux/episodes.jsonl && cmp ${CMAKE_CURRENT_BINARY_DIR}/sim_bench/summary.json ${CMAKE_CURRENT_SOURCE_DIR}/results/host_linux/summary.json")
+elseif(NOT RELMW_QNX)
   add_test(NAME test_supervisor_e2e COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_supervisor_e2e.sh $<TARGET_FILE:relmw_supervisor> ${CMAKE_CURRENT_SOURCE_DIR}/scripts/relmwctl)
   add_test(NAME test_robotd_e2e COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_robotd_e2e.sh $<TARGET_FILE:relmw_robotd> $<TARGET_FILE:relmw_supervisor>)
   # QNX 8.0 layer: -fsyntax-only against transcribed API stubs (+ stub self-test). GCC only (stubs wrap glibc headers).
