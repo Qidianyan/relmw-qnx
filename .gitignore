@@ -3,3 +3,4 @@ build*/
 secrets/
 *.env
 results/*.tmp
+__pycache__/
