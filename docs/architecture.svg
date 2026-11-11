@@ -1,74 +1,116 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="17" fill="#16181D">
   <title>relmw-qnx architecture</title>
-  <rect width="960" height="600" fill="#ffffff"/>
-  <text x="480" y="30" text-anchor="middle" font-size="20" font-weight="bold">relmw-qnx: reliability supervisor on QNX OS 8.0</text>
+  <desc>Two QNX processes (supervisor and robot driver) talking by message passing, supervised by HAM, operated through /dev/relmw. SPDX-License-Identifier: MIT. Copyright (c) 2026 elidot.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A4F59"/></marker>
+    <marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#C2410C"/></marker>
+    <style>
+      .t{font-weight:700;font-size:19px}.s{font-size:15px;fill:#4A4F59}.m{font-family:"DejaVu Sans Mono",Menlo,monospace;font-size:15px}
+      .k{font-size:13px;letter-spacing:1.5px;fill:#4A4F59;font-weight:700}.box{fill:#fff;stroke:#D6D2C8;stroke-width:1.5}
+      .proc{fill:#FBFAF7;stroke:#16181D;stroke-width:2}.hot{fill:#FFF4ED;stroke:#C2410C;stroke-width:2}
+      .ln{stroke:#4A4F59;stroke-width:2;fill:none}.lo{stroke:#C2410C;stroke-width:2.5;fill:none}.lab{font-size:14px;fill:#4A4F59}
+    </style>
+  </defs>
+  <rect width="1600" height="900" fill="#F6F4EF"/>
+  <text x="40" y="52" font-size="30" font-weight="700">relmw-qnx · reliability supervisor on QNX OS 8.0</text>
+  <text x="40" y="82" class="s">Two processes, QNX message passing between them, HAM restarts either one, operators use plain files.</text>
+
   <!-- operators -->
-  <rect x="30" y="60" width="250" height="110" rx="8" fill="#f2f2f2" stroke="#555"/>
-  <text x="155" y="82" text-anchor="middle" font-weight="bold">Operators / HMI / scripts</text>
-  <text x="45" y="105">$ cat /dev/relmw/status</text>
-  <text x="45" y="125">$ cat /dev/relmw/events</text>
-  <text x="45" y="145">$ echo "fault percep_bias" &gt; /dev/relmw/ctl</text>
-  <text x="45" y="162" font-size="11" fill="#555">(scripts/relmwctl wraps these)</text>
-  <!-- HAM -->
-  <rect x="680" y="60" width="250" height="110" rx="8" fill="#fde9e7" stroke="#b03a2e"/>
-  <text x="805" y="82" text-anchor="middle" font-weight="bold">HAM (High Availability Manager)</text>
-  <text x="692" y="105" font-size="12">CONDDEATH → restart action</text>
-  <text x="692" y="125" font-size="12">heartbeat entity relmw_supervisor_hb</text>
-  <text x="692" y="145" font-size="12">missed high → slay own pid → restart</text>
-  <text x="692" y="162" font-size="11" fill="#555">apps/relmw_ham_setup.cpp, qnx_timer.cpp</text>
+  <rect x="40" y="130" width="330" height="200" rx="10" class="box"/>
+  <text x="60" y="160" class="k">OPERATOR · HMI · SCRIPTS</text>
+  <text x="60" y="192" class="m">cat /dev/relmw/status</text>
+  <text x="60" y="216" class="m">cat /dev/relmw/events</text>
+  <text x="60" y="240" class="m">echo "fault bump" &gt;</text>
+  <text x="60" y="262" class="m">     /dev/relmw/ctl</text>
+  <text x="60" y="300" class="s">scripts/relmwctl wraps these</text>
+
+  <rect x="40" y="370" width="330" height="170" rx="10" class="box" stroke-dasharray="6 5"/>
+  <text x="60" y="400" class="k">HOST-SIDE PLANNER (OFF RT PATH)</text>
+  <text x="60" y="430" class="m">tools/llm_assist.py plan</text>
+  <text x="60" y="456" class="s">sentence → closed-vocabulary</text>
+  <text x="60" y="478" class="s">subtask order, offline fallback</text>
+  <text x="60" y="512" class="m">plan push_B,push_A → ctl</text>
+
   <!-- supervisor process -->
-  <rect x="30" y="200" width="900" height="300" rx="10" fill="#eaf2fb" stroke="#1f4e79" stroke-width="2"/>
-  <text x="45" y="222" font-weight="bold" fill="#1f4e79">relmw_supervisor process (apps/relmw_supervisor.cpp)</text>
-  <!-- resmgr thread -->
-  <rect x="50" y="240" width="270" height="120" rx="6" fill="#ffffff" stroke="#1f4e79"/>
-  <text x="185" y="260" text-anchor="middle" font-weight="bold">Resource manager thread</text>
-  <text x="62" y="282">resmgr_attach /dev/relmw/{status,</text>
-  <text x="62" y="300">events,ctl}; io_read / io_write</text>
-  <text x="62" y="318">dispatch_block → dispatch_handler</text>
-  <text x="62" y="348" font-size="11" fill="#555">src/platform/qnx/qnx_resmgr.cpp</text>
-  <!-- control thread -->
-  <rect x="345" y="240" width="300" height="240" rx="6" fill="#ffffff" stroke="#1f4e79"/>
-  <text x="495" y="260" text-anchor="middle" font-weight="bold" font-size="12">Control thread (SCHED_FIFO / SPORADIC)</text>
-  <text x="357" y="282">timer_create(CLOCK_MONOTONIC)</text>
-  <text x="357" y="300">  → SIGEV_PULSE (explicit priority)</text>
-  <text x="357" y="318">  → MsgReceivePulse on private channel</text>
-  <text x="357" y="342" font-weight="bold">ReliabilityMiddleware::run()</text>
-  <text x="357" y="360">sub-task → verifier (settle + hold)</text>
-  <text x="357" y="378">fail → classify → correlated? → rollback</text>
-  <text x="357" y="396">robot only → CorrelationAwareRetry</text>
-  <text x="357" y="414">(never repeat a failed strategy)</text>
-  <text x="357" y="432">→ ladder exhausted → escalate to human</text>
-  <text x="357" y="452">release latency histogram (O(1), no alloc)</text>
-  <text x="357" y="470" font-size="10" fill="#555">src/core/middleware.cpp, retry_policy.cpp, latency.cpp</text>
-  <!-- logging + library -->
-  <rect x="670" y="240" width="240" height="100" rx="6" fill="#ffffff" stroke="#1f4e79"/>
-  <text x="790" y="260" text-anchor="middle" font-weight="bold">slog2 buffer "relmw"</text>
-  <text x="682" y="282">slog2_register / vslog2f</text>
-  <text x="682" y="300">$ slog2info -b relmw</text>
-  <text x="682" y="328" font-size="11" fill="#555">src/platform/qnx/qnx_log.cpp</text>
-  <rect x="670" y="355" width="240" height="125" rx="6" fill="#ffffff" stroke="#1f4e79"/>
-  <text x="790" y="375" text-anchor="middle" font-weight="bold">Failure library</text>
-  <text x="682" y="397">(sub-task, mode, strategy) →</text>
-  <text x="682" y="415">successes / tries, Beta prior</text>
-  <text x="682" y="433">saved atomically after each episode,</text>
-  <text x="682" y="451">reloaded after a HAM restart</text>
-  <rect x="50" y="375" width="270" height="105" rx="6" fill="#ffffff" stroke="#1f4e79"/>
-  <text x="185" y="395" text-anchor="middle" font-weight="bold">RobotAdapter</text>
-  <text x="62" y="417">get_obs / step / move_robot_to</text>
-  <text x="62" y="435">today: deterministic PushSim2D</text>
-  <text x="62" y="453">next: driver process /dev/robot0</text>
-  <text x="62" y="471" font-size="11" fill="#555">include/relmw/robot.hpp, src/core/sim2d.cpp</text>
+  <rect x="420" y="120" width="700" height="560" rx="14" class="proc"/>
+  <text x="444" y="152" class="t">relmw_supervisor</text>
+  <text x="636" y="152" class="s">apps/relmw_supervisor.cpp</text>
+
+  <rect x="444" y="172" width="300" height="150" rx="10" class="box"/>
+  <text x="462" y="200" class="k">RESOURCE MANAGER THREAD</text>
+  <text x="462" y="228" class="m">/dev/relmw/{status,events,ctl}</text>
+  <text x="462" y="254" class="s">resmgr_attach · io_read · io_write</text>
+  <text x="462" y="278" class="s">dispatch_block → dispatch_handler</text>
+  <text x="462" y="306" class="s">qnx_resmgr.cpp</text>
+
+  <rect x="772" y="172" width="324" height="320" rx="10" class="hot"/>
+  <text x="790" y="200" class="k">CONTROL THREAD · 1 kHz</text>
+  <text x="790" y="228" class="m">timer_create → SIGEV_PULSE</text>
+  <text x="790" y="252" class="m">→ MsgReceivePulse</text>
+  <text x="790" y="280" class="s">SCHED_FIFO or SCHED_SPORADIC</text>
+  <text x="790" y="304" class="s">runmask: --cpu N (pthread_cluster_set)</text>
+  <text x="790" y="340" class="t" font-size="17">ReliabilityMiddleware::run()</text>
+  <text x="790" y="366" class="s">sub-task → verifier (settle + hold)</text>
+  <text x="790" y="390" class="s">fail → classify → correlated?</text>
+  <text x="790" y="414" class="s">→ robot-only rollback → new strategy</text>
+  <text x="790" y="438" class="s">never repeat a failed strategy</text>
+  <text x="790" y="462" class="s">ladder exhausted → escalate to human</text>
+  <text x="790" y="484" class="s">qnx_timer.cpp · middleware.cpp</text>
+
+  <rect x="444" y="346" width="300" height="146" rx="10" class="box"/>
+  <text x="462" y="374" class="k">FAILURE LIBRARY</text>
+  <text x="462" y="402" class="s">(sub-task, mode, strategy) →</text>
+  <text x="462" y="426" class="s">successes / tries, Beta prior</text>
+  <text x="462" y="450" class="s">saved atomically every episode,</text>
+  <text x="462" y="474" class="s">reloaded after a restart</text>
+
+  <rect x="444" y="516" width="652" height="140" rx="10" class="box"/>
+  <text x="462" y="544" class="k">SLOG2 BUFFER "relmw" · LATENCY HISTOGRAM</text>
+  <text x="462" y="572" class="m">slog2_register / vslog2f   ·   slog2info -b relmw</text>
+  <text x="462" y="600" class="s">release latency p50 / p99 / max and deadline misses, O(1), no allocation</text>
+  <text x="462" y="626" class="s">on the tick path (test_rt_noalloc)  ·  qnx_log.cpp, latency.cpp</text>
+
+  <!-- robot driver process -->
+  <rect x="1180" y="300" width="380" height="380" rx="14" class="proc"/>
+  <text x="1204" y="332" class="t">relmw_robotd</text>
+  <text x="1356" y="332" class="s">apps/relmw_robotd.cpp</text>
+  <rect x="1204" y="352" width="332" height="150" rx="10" class="box"/>
+  <text x="1222" y="380" class="k">RESOURCE MANAGER /dev/robot0</text>
+  <text x="1222" y="408" class="s">fixed-size _IO_MSG requests</text>
+  <text x="1222" y="432" class="s">checks mgrid, open mode, lengths</text>
+  <text x="1222" y="456" class="s">MsgReply · _RESMGR_NOREPLY</text>
+  <text x="1222" y="484" class="s">qnx_robot_link.cpp</text>
+  <rect x="1204" y="520" width="332" height="136" rx="10" class="box"/>
+  <text x="1222" y="548" class="k">ROBOT + GROUND TRUTH</text>
+  <text x="1222" y="576" class="s">today: deterministic PushSim2D</text>
+  <text x="1222" y="600" class="s">tomorrow: the real arm driver</text>
+  <text x="1222" y="630" class="s">RobotServer::handle()</text>
+
+  <!-- HAM -->
+  <rect x="1180" y="120" width="380" height="150" rx="10" class="box" stroke="#B42318"/>
+  <text x="1200" y="150" class="k" fill="#B42318">HIGH AVAILABILITY MANAGER</text>
+  <text x="1200" y="180" class="s">CONDDEATH → restart (both processes)</text>
+  <text x="1200" y="206" class="s">heartbeat missed → kill → restart</text>
+  <text x="1200" y="232" class="m">relmw_ham_setup --name …</text>
+  <text x="1200" y="256" class="s">ham_attach · ham_action_restart</text>
+
   <!-- arrows -->
-  <defs><marker id="a" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#333"/></marker></defs>
-  <line x1="155" y1="170" x2="155" y2="238" stroke="#333" stroke-width="1.5" marker-end="url(#a)"/>
-  <text x="162" y="195" font-size="11">open/read/write = QNX messages</text>
-  <line x1="320" y1="300" x2="343" y2="300" stroke="#333" stroke-width="1.5" marker-end="url(#a)"/>
-  <line x1="645" y1="290" x2="668" y2="290" stroke="#333" stroke-width="1.5" marker-end="url(#a)"/>
-  <line x1="645" y1="410" x2="668" y2="410" stroke="#333" stroke-width="1.5" marker-end="url(#a)"/>
-  <line x1="343" y1="430" x2="322" y2="430" stroke="#333" stroke-width="1.5" marker-end="url(#a)"/>
-  <line x1="805" y1="170" x2="805" y2="238" stroke="#b03a2e" stroke-width="1.5" marker-end="url(#a)"/>
-  <!-- footer: portability -->
-  <rect x="30" y="520" width="900" height="60" rx="8" fill="#f7f7f7" stroke="#999"/>
-  <text x="45" y="542" font-size="12"><tspan font-weight="bold">Portable core</tspan> (src/core, no OS calls) same sources for Linux (g++/clang, tested) and QNX (q++, first build pending SDP); own RNG → bit-identical results.</text>
-  <text x="45" y="565" font-size="12"><tspan font-weight="bold">Platform layer</tspan>: src/platform/qnx (QNX 8.0) or src/platform/posix (Linux host baseline: clock_nanosleep, FIFO, stderr).</text>
+  <path class="ln" d="M370,230 L444,230" marker-end="url(#a)"/>
+  <text x="372" y="218" class="lab">open/read/</text><text x="372" y="252" class="lab">write</text>
+  <path class="ln" d="M370,455 C400,455 400,300 444,300" marker-end="url(#a)"/>
+  <path class="ln" d="M744,246 L772,246" marker-end="url(#a)"/>
+  <path class="ln" d="M772,420 L744,420" marker-end="url(#a)"/>
+  <path class="lo" d="M1096,400 L1204,400" marker-end="url(#o)"/>
+  <path class="lo" d="M1204,470 L1096,470" marker-end="url(#o)"/>
+  <text x="1104" y="390" class="lab" fill="#C2410C">MsgSend</text>
+  <text x="1104" y="492" class="lab" fill="#C2410C">MsgReply</text>
+  <path class="ln" d="M1370,270 L1370,300" marker-end="url(#a)" stroke="#B42318"/>
+  <path class="ln" d="M1180,200 L1120,200" marker-end="url(#a)" stroke="#B42318"/>
+
+  <!-- bottom band -->
+  <rect x="40" y="710" width="1520" height="150" rx="10" class="box"/>
+  <text x="60" y="742" class="k">LEAST PRIVILEGE (secpol draft)</text>
+  <text x="60" y="770" class="s">types relmw_supervisor_t · relmw_robotd_t · relmw_operator_t; only pathspace + public_channel; config/secpol/relmw_secpol.txt</text>
+  <text x="60" y="808" class="k">ONE SOURCE TREE, THREE PLATFORM LAYERS</text>
+  <text x="60" y="836" class="s">portable core (src/core, no OS calls, bit-identical results)  +  src/platform/qnx (QNX 8.0)  |  src/platform/posix (Linux host)  |  compat/qnx_sim (QNX API simulation on Linux, not QNX)</text>
 </svg>
