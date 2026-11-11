@@ -15,6 +15,7 @@ to a temp directory, and checks:
 import html.parser
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -95,9 +96,91 @@ class DashboardTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             page = self.run_gen(os.path.join(td, "dashboard.html"))
             self.assertNotIn("<script src", page)
-            self.assertNotIn("http://", page)
-            self.assertNotIn("https://", page)
             self.assertNotIn("<link", page)
+            self.assertNotIn("@import", page)
+            self.assertIsNone(re.search(r"url\(\s*['\"]?(https?:|//)", page))
+            # the only URL allowed is the SVG namespace (used when the PNG card is serialized)
+            urls = set(re.findall(r"https?://[^\s\"'<>)]*", page))
+            self.assertLessEqual(urls, {"http://www.w3.org/2000/svg"}, urls)
+
+    def test_embedded_json_matches_summary(self):
+        with tempfile.TemporaryDirectory() as td:
+            page = self.run_gen(os.path.join(td, "d.html"))
+            m = re.search(r'<script type="application/json" id="relmw-data">(.*?)</script>', page, re.S)
+            self.assertIsNotNone(m)
+            data = json.loads(m.group(1))
+            with open(os.path.join(HOST, "summary.json"), encoding="utf-8") as fh:
+                summary = json.load(fh)
+            self.assertEqual(data["summary"], summary)
+            f = data["summary"]["conditions"]["field"]
+            self.assertEqual([f[k]["success"] for k in ("single_pass", "naive_retry", "corr_aware_retry")], [78, 80, 98])
+            self.assertEqual(data["qnx_reports"], [])
+            self.assertEqual(data["qnx_pending"], QNX_PENDING)
+            self.assertTrue(all(len(x["sha12"]) == 12 for x in data["inputs"]))
+
+    def test_kpis_from_data(self):
+        with tempfile.TemporaryDirectory() as td:
+            page = self.run_gen(os.path.join(td, "d.html"))
+            self.assertIn('class="v acc">98/100<', page)
+            self.assertIn(">+20 pp<", page)
+            self.assertIn("1.9e-06", page)          # McNemar p corr_aware vs single_pass, as in summary.json
+            self.assertIn(">262.1<", page)          # host p99 (SCHED_OTHER 1 kHz)
+
+    def test_only_vendored_phosphor_icons(self):
+        icon_dir = os.path.join(ROOT, "tools", "dashboard_assets", "phosphor", "regular")
+        vendored = set()
+        for name in os.listdir(icon_dir):
+            with open(os.path.join(icon_dir, name), encoding="utf-8") as fh:
+                vendored.update(re.findall(r'<path d="([^"]+)"', fh.read()))
+        with tempfile.TemporaryDirectory() as td:
+            page = self.run_gen(os.path.join(td, "d.html"))
+            icons = re.findall(r'<svg class="ph"[^>]*>(.*?)</svg>', page, re.S)
+            self.assertGreaterEqual(len(icons), 10)
+            for inner in icons:
+                paths = re.findall(r'<path d="([^"]+)"', inner)
+                self.assertTrue(paths)
+                for d in paths:
+                    self.assertIn(d, vendored)
+                self.assertNotIn("<img", inner)
+
+    def test_no_emoji_and_brand(self):
+        with tempfile.TemporaryDirectory() as td:
+            page = self.run_gen(os.path.join(td, "d.html"))
+            bad = [c for c in page if 0x1F000 <= ord(c) <= 0x1FAFF or 0x2600 <= ord(c) <= 0x27BF]
+            self.assertEqual(bad, [])
+            self.assertIn("elidot", page)
+            for word in ("有限公司", "Co., Ltd", "Inc.", "LLC", "GmbH"):
+                self.assertNotIn(word, page)
+
+    def test_function_paths_present(self):
+        with tempfile.TemporaryDirectory() as td:
+            page = self.run_gen(os.path.join(td, "d.html"))
+            for needle in ('id="a-copy"', 'id="a-share"', 'id="a-md"', 'id="a-json"', 'id="a-png"', 'id="a-print"',
+                           "history.replaceState", "navigator.clipboard", "toBlob", "window.print",
+                           'data-set-cond="nominal"', 'data-toggle-arm="naive_retry"', 'href="#results"',
+                           "@media print", 'aria-live="polite"'):
+                self.assertIn(needle, page)
+
+    def test_sim_block_labelled(self):
+        with tempfile.TemporaryDirectory() as td:
+            sdir = os.path.join(td, "sim")
+            os.makedirs(sdir)
+            with open(os.path.join(HOST, "rt_report_sched_other_1khz.json"), encoding="utf-8") as fh:
+                rep = json.load(fh)
+            rep["platform"] = "QNX API simulation on Linux (not QNX)"
+            with open(os.path.join(sdir, "rt_report_sim_1khz.json"), "w", encoding="utf-8") as fh:
+                json.dump(rep, fh)
+            cmd = [sys.executable, TOOL, "--host", HOST, "--sim", sdir, "--out", os.path.join(td, "d.html")]
+            proc = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            page = open(os.path.join(td, "d.html"), encoding="utf-8").read()
+            m = re.search(r'<div class="simblk".*?class="cap tcap">.*?</p>', page, re.S)
+            self.assertIsNotNone(m)
+            blk = m.group(0)
+            self.assertIn("QNX API simulation on Linux, not QNX</h3>", blk)                     # heading
+            self.assertIn('aria-label="QNX API simulation on Linux, not QNX: release latency', blk)   # chart
+            self.assertIn('<p class="cap tcap">QNX API simulation on Linux, not QNX.', blk)        # table caption
+            self.assertIn(QNX_PENDING, page)   # never merged with QNX numbers
 
     def test_html_parses_and_svg_closed(self):
         with tempfile.TemporaryDirectory() as td:
