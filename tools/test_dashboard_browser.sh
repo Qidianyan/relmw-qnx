@@ -6,7 +6,9 @@
 #   2. invalid params (cond=zzz, arms=bogus) fall back to field / all arms;
 #   3. no horizontal page scroll at 390 px (the page is loaded in a 390 px iframe: headless Chrome clamps windows
 #      to >= 500 px, an iframe does not);
-#   4. a 390x844 screenshot can be taken.
+#   4. a 390x844 screenshot can be taken;
+#   5. at 1440 and 1280 px no table is clipped inside its scroll box and no KPI line overflows its card
+#      (the page reports this itself in body data-clipped-tables / data-kpi-overflow).
 set -u
 DIR=$(cd "$(dirname "$0")/.." && pwd)
 PAGE=$DIR/docs/dashboard.html
@@ -43,6 +45,12 @@ set -- $sw
 [ "$2" -eq 390 ] || fail "iframe viewport is $2 px, expected 390"
 [ "$1" -le 390 ] || fail "horizontal scroll at 390 px: scrollWidth=$1"
 
+for w in 1440 1280; do
+  b=$(run --hide-scrollbars --window-size=$w,900 --virtual-time-budget=3000 --dump-dom "file://$PAGE" | grep -o '<body[^>]*>' | head -1)
+  echo "$b" | grep -q 'data-clipped-tables="0"' || fail "table clipped at $w px: $(echo "$b" | grep -o 'data-clipped-list="[^"]*"')"
+  echo "$b" | grep -q 'data-kpi-overflow="0"' || fail "KPI line overflows its card at $w px: $b"
+done
+
 run --hide-scrollbars --window-size=390,844 --screenshot="$T/m.png" "file://$PAGE" >/dev/null
 [ -s "$T/m.png" ] || fail "screenshot at 390x844 failed"
-echo "test_dashboard_browser: OK (URL state, fallback, no horizontal scroll at 390 px: $1/$2, screenshot)"
+echo "test_dashboard_browser: OK (URL state, fallback, no horizontal scroll at 390 px: $1/$2, no clipped table or KPI line at 1440/1280, screenshot)"

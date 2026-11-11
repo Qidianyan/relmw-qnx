@@ -136,7 +136,7 @@ def icon(name, cls="ph"):
 
 CSS = """
 :root{--bg:#F6F4EF;--surface:#FFFFFF;--ink:#16181D;--ink-2:#4A4F59;--line:#E3E0D8;--accent:#C2410C;
---ok:#2F7D4F;--bad:#B42318;--pending:#9A6700;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+--ok:#2F7D4F;--bad:#B42318;--pending:#9A6700;--halo:#FFFFFF;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;scroll-padding-top:120px}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
@@ -184,7 +184,9 @@ h1{font-size:22px;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
 .kpi .k{display:flex;align-items:center;gap:6px;font:600 11px/1.2 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
 .kpi .v{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-variant-numeric:tabular-nums lining-nums;font-size:32px;font-weight:650;margin:10px 0 4px;letter-spacing:-.025em;line-height:1.1}
 .kpi .v.acc{color:var(--accent)}
-.kpi .s{font-size:12px;color:var(--ink-2)}
+.kpi .s{font-size:12px;color:var(--ink-2);display:grid;gap:2px}
+.kpi .ln{display:block}
+.kpi .ln.nw{white-space:nowrap;overflow:hidden;text-overflow:clip}
 .kpi .s b{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
 .hero{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;padding:8px 0 14px}
 .eyebrow{display:flex;align-items:center;gap:8px;margin:0;font:600 12px/1.2 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
@@ -210,8 +212,8 @@ h3{font-size:14px;font-weight:600;margin:16px 0 6px}
 .bt{position:relative;height:18px;background:#EFECE5;border-radius:2px}
 .bt::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:#D6D1C6}
 .bt i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;z-index:1}
-.bt .ci{position:absolute;z-index:2;top:8px;height:2px;background:var(--ink)}
-.bt .ci::before,.bt .ci::after{content:"";position:absolute;top:-4px;width:2px;height:10px;background:var(--ink)}
+.bt .ci{position:absolute;z-index:2;top:8px;height:2px;background:var(--ink);box-shadow:0 0 0 1.5px var(--halo)}
+.bt .ci::before,.bt .ci::after{content:"";position:absolute;top:-4px;width:2px;height:10px;background:var(--ink);box-shadow:0 0 0 1.5px var(--halo)}
 .bt .ci::before{left:0}.bt .ci::after{right:0}
 .bv{font-size:13px;font-weight:600;text-align:right}
 .rtsvg{max-width:900px}
@@ -219,13 +221,16 @@ h3{font-size:14px;font-weight:600;margin:16px 0 6px}
 .cap{font-size:12px;color:var(--ink-2);margin:6px 0 0}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .hint{display:none;font-size:12px;color:var(--ink-2);margin:4px 0 0}
+.hint.show{display:block}
 table{border-collapse:collapse;width:100%;font-size:13px}
-th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th,td{padding:8px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{white-space:normal;vertical-align:bottom;hyphens:manual;min-width:5.5ch}
 th{font:600 11px/1.2 system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);background:#FBFAF7}
 td:first-child,th:first-child{text-align:left}
 td{font-variant-numeric:tabular-nums}
 td.num,.num{font-family:var(--mono);font-size:12.5px}
 tr.me td{font-weight:600}
+td.wrap{white-space:normal;overflow-wrap:anywhere;text-align:left}
 .bar{display:flex;align-items:center;gap:8px;justify-content:flex-end}
 .bar i{display:block;height:8px;border-radius:2px;min-width:1px}
 .bar .track{width:90px;height:8px;background:#EFECE5;border-radius:2px;overflow:hidden}
@@ -245,7 +250,7 @@ footer p{margin:4px 0}
 .fallback{display:none;margin-top:6px}
 .fallback input{width:min(520px,100%);font:12px var(--mono);padding:6px;border:1px solid var(--line);border-radius:6px}
 @media (min-width:1100px){.prov2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
-@media (max-width:1099px){.wrap{grid-template-columns:minmax(0,1fr)}nav.index{display:none}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:1279px){.wrap{grid-template-columns:minmax(0,1fr)}nav.index{display:none}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
  .grid2{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:640px){.top{position:static}.top-in{padding:10px 14px}.wrap{padding:16px 14px 40px}.kpis{grid-template-columns:minmax(0,1fr)}
  .actions{margin-left:0;width:100%}.chartwrap{overflow-x:auto}.brow,.bars-h{grid-template-columns:96px minmax(0,1fr) 56px;gap:8px}.bl{font-size:12px}.chartwrap svg.chart{min-width:600px}.btn .lbl-long{display:none}.hint{display:block}.kpi .v{font-size:26px}.hero h1{font-size:30px}.hero .sub{font-size:15px}
@@ -353,9 +358,9 @@ def scroll_table(inner, caption):
 
 
 def cond_table(arms_data):
-    head = ("<tr><th>arm</th><th>success/N</th><th>rate (95% CI)</th><th>detected failures</th><th>recovered</th>"
-            "<th>escalated</th><th>retries (same failure again)</th><th>mean sim steps</th>"
-            "<th>vs no middleware</th><th>McNemar p</th></tr>")
+    head = ("<tr><th>arm</th><th>success/N</th><th>rate (95% CI)</th><th>detected</th><th>recovered</th>"
+            "<th>escalated</th><th>retries (same again)</th><th>mean steps</th>"
+            "<th>vs none</th><th>McNemar&nbsp;p</th></tr>")
     rows = []
     for k in ARM_KEYS:
         a = arms_data.get(k)
@@ -517,7 +522,7 @@ def provenance_section(summary, inputs):
                '<dt>Statistics</dt><dd>Wilson 95% intervals; McNemar exact test on paired episodes</dd>'
                '<dt>Reproduce</dt><dd><code class="mono">relmw_bench --n 100 --out results/host_linux</code></dd>'
                '</dl></div><div class="card">')
-    rows = "".join(f"<tr><td class='mono'>{esc(f['file'])}</td><td class='mono'>{esc(f['sha12'])}</td></tr>"
+    rows = "".join(f"<tr><td class='mono wrap'>{esc(f['file'])}</td><td class='mono'>{esc(f['sha12'])}</td></tr>"
                    for f in inputs)
     out.append(scroll_table("<tr><th>input file</th><th>sha256[:12]</th></tr>" + rows,
                             "Every number on this page comes from these files."))
@@ -549,27 +554,31 @@ def kpis(summary, host_reports):
     vs = mw.get("vs_single_pass") or {}
     ci = mw.get("success_ci95")
     out = ['<div class="kpis" role="list">']
-    out.append(f'<div class="kpi" role="listitem"><div class="k">{icon("shield-check")} Field success · relmw</div>'
-               f'<div class="v acc">{fmt_int(mw.get("success"))}/{fmt_int(mw.get("N"))}</div>'
-               f'<div class="s">95% CI {esc(ci_text(ci))} · naive <b>{fmt_int(nv.get("success"))}</b> · '
-               f'none <b>{fmt_int(sp.get("success"))}</b></div></div>')
+    def card(ico, title, value, lines):
+        sub = "".join(f'<span class="ln{" nw" if nw else ""}">{t}</span>' for t, nw in lines)
+        return (f'<div class="kpi" role="listitem"><div class="k">{icon(ico)} {title}</div>'
+                f'<div class="v{" acc" if ico == "shield-check" else ""}">{value}</div><div class="s">{sub}</div></div>')
+    NB = "&nbsp;"
+    out.append(card("shield-check", "Field success · relmw", f'{fmt_int(mw.get("success"))}/{fmt_int(mw.get("N"))}',
+                    [(f'95%{NB}CI{NB}{esc(ci_text(ci))}', True),
+                     (f'naive{NB}<b>{fmt_int(nv.get("success"))}</b> · none{NB}<b>{fmt_int(sp.get("success"))}</b>', True)]))
     diff = vs.get("diff")
-    out.append(f'<div class="kpi" role="listitem"><div class="k">{icon("chart-bar")} vs no middleware</div>'
-               f'<div class="v">{"%+.0f pp" % (diff * 100) if num(diff) else DASH}</div>'
-               f'<div class="s">McNemar p = <b>{esc(fmt_p(vs.get("mcnemar_p")))}</b> · fixed '
-               f'<b>{fmt_int(vs.get("fixed"))}</b>, broken <b>{fmt_int(vs.get("broken"))}</b></div></div>')
-    out.append(f'<div class="kpi" role="listitem"><div class="k">{icon("arrow-counter-clockwise")} Same failure repeated</div>'
-               f'<div class="v">{fmt_int(mw.get("retries_repeating_same_failure"))}<span style="font-size:16px;color:#4A4F59">'
-               f'/{fmt_int(mw.get("retries"))}</span></div>'
-               f'<div class="s">retries that failed the same way again · naive retry <b>'
-               f'{fmt_int(nv.get("retries_repeating_same_failure"))}/{fmt_int(nv.get("retries"))}</b></div></div>')
+    out.append(card("chart-bar", "vs no middleware", "%+.0f pp" % (diff * 100) if num(diff) else DASH,
+                    [(f'McNemar{NB}p{NB}={NB}<b>{esc(fmt_p(vs.get("mcnemar_p")))}</b>', True),
+                     (f'fixed{NB}<b>{fmt_int(vs.get("fixed"))}</b> · broken{NB}<b>{fmt_int(vs.get("broken"))}</b>', True)]))
+    out.append(card("arrow-counter-clockwise", "Same failure repeated",
+                    f'{fmt_int(mw.get("retries_repeating_same_failure"))}<span style="font-size:16px;color:#4A4F59">'
+                    f'/{fmt_int(mw.get("retries"))}</span>',
+                    [("retries that failed the same way again", False),
+                     (f'naive{NB}retry{NB}<b>{fmt_int(nv.get("retries_repeating_same_failure"))}/'
+                      f'{fmt_int(nv.get("retries"))}</b>', True)]))
     p99 = mx = DASH
     if host_reports:
         rl = host_reports[0][1].get("release_latency") or {}
         p99, mx = us_of(rl.get("p99_ns")), us_of(rl.get("max_ns"))
-    out.append(f'<div class="kpi" role="listitem"><div class="k">{icon("timer")} Host loop p99 · 1 kHz</div>'
-               f'<div class="v">{esc(p99)}<span style="font-size:16px;color:#4A4F59"> µs</span></div>'
-               f'<div class="s">Linux, SCHED_OTHER, shared machine · max <b>{esc(mx)} µs</b> · QNX pending</div></div>')
+    out.append(card("timer", "Host loop p99 · 1 kHz", f'{esc(p99)}<span style="font-size:16px;color:#4A4F59"> µs</span>',
+                    [("Linux, SCHED_OTHER, shared host", False),
+                     (f'max{NB}<b>{esc(mx)}{NB}µs</b> · QNX{NB}pending', True)]))
     out.append('</div>')
     return "".join(out)
 
@@ -730,6 +739,13 @@ if (sec && /^[a-z]+$/.test(sec) && document.getElementById(sec)) {
 }
 body.setAttribute('data-ready', '1');
 body.setAttribute('data-scroll-width', String(document.documentElement.scrollWidth));
+var clipped = [];
+document.querySelectorAll('.scroll').forEach(function(el, i){ if (el.offsetParent && el.scrollWidth > el.clientWidth + 1) { clipped.push(el.getAttribute('aria-label') || String(i)); var h = el.nextElementSibling; if (h && h.classList.contains('hint')) h.classList.add('show'); } });
+body.setAttribute('data-clipped-tables', String(clipped.length));
+body.setAttribute('data-clipped-list', clipped.join(' | '));
+var kov = 0;
+document.querySelectorAll('.kpi .ln.nw').forEach(function(el){ if (el.scrollWidth > el.clientWidth + 1) kov++; });
+body.setAttribute('data-kpi-overflow', String(kov));
 })();
 """
 

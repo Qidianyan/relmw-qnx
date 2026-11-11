@@ -12,6 +12,7 @@ to a temp directory, and checks:
   * the HTML parses cleanly and every opened <svg> is closed.
 """
 
+import html
 import html.parser
 import json
 import os
@@ -24,6 +25,9 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOL = os.path.join(ROOT, "tools", "make_dashboard.py")
 HOST = os.path.join(ROOT, "results", "host_linux")
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+import make_dashboard as mdash  # noqa: E402
+
 QNX_PENDING = "【待 QNX 实测】 (pending first run on QNX 8.0 in QEMU)"
 
 
@@ -137,6 +141,49 @@ class DashboardTest(unittest.TestCase):
             self.assertNotIn("var(--mono)", kv)
             self.assertIn("tabular-nums", kv)
             self.assertIn("aria-current", page)
+
+    def test_ci_whisker_contrast_wcag_aa(self):
+        # WCAG 2.1 SC 1.4.11 (AA): graphical objects need >= 3:1 against adjacent colours. The whisker is ink
+        # with a white halo, so it is adjacent to the halo (not the bar) wherever it crosses a bar.
+        def lum(hx):
+            c = [int(hx[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+            c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+            return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+        def cr(a, b):
+            la, lb = sorted((lum(a), lum(b)), reverse=True)
+            return (la + 0.05) / (lb + 0.05)
+        with tempfile.TemporaryDirectory() as td:
+            page = self.run_gen(os.path.join(td, "d.html"))
+        var = dict(re.findall(r"--(ink|halo):(#[0-9A-Fa-f]{6})", page))
+        ci_rules = re.findall(r"\.bt \.ci(?:::before,\.bt \.ci::after)?\{([^}]*)\}", page)
+        self.assertEqual(len(ci_rules), 2)
+        for rule in ci_rules:
+            self.assertIn("background:var(--ink)", rule)
+            self.assertIn("box-shadow:0 0 0 1.5px var(--halo)", rule)
+        track = re.search(r"\.bt\{[^}]*background:(#[0-9A-Fa-f]{6})", page).group(1)
+        self.assertGreaterEqual(cr(var["ink"], var["halo"]), 3.0)
+        self.assertGreaterEqual(cr(var["ink"], track), 3.0)
+        for bar in mdash.ARM_COLOR.values():   # halo must separate the whisker from every bar colour
+            self.assertGreaterEqual(cr(var["halo"], bar), 3.0, bar)
+
+    def test_kpi_lines_no_orphan_separators(self):
+        with tempfile.TemporaryDirectory() as td:
+            page = self.run_gen(os.path.join(td, "d.html"))
+        lines = re.findall(r'<span class="ln( nw)?">(.*?)</span>(?=<span class="ln|</div>)', page)
+        self.assertEqual(len(lines), 8)
+        for nw, text in lines:
+            plain = html.unescape(re.sub(r"<[^>]+>", "", text))
+            self.assertFalse(plain.lstrip().startswith("·"), plain)
+            if "·" in plain or re.search(r"\d", plain):
+                self.assertEqual(nw, " nw", plain)   # lines with numbers or separators never wrap
+            self.assertNotRegex(plain, r"[^\s\xa0] [\d]", plain)  # a number is always tied to its label
+
+    def test_tables_fit_headers(self):
+        with tempfile.TemporaryDirectory() as td:
+            page = self.run_gen(os.path.join(td, "d.html"))
+        self.assertIn("th{white-space:normal", page)
+        self.assertIn("<th>McNemar&nbsp;p</th>", page)
+        self.assertIn("data-clipped-tables", page)
 
     def test_only_vendored_phosphor_icons(self):
         icon_dir = os.path.join(ROOT, "tools", "dashboard_assets", "phosphor", "regular")
