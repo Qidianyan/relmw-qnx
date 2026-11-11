@@ -124,7 +124,7 @@ QNX version: QNX SDP 8.0 (QNX Everywhere non-commercial license). Target: QEMU x
 file provided for Raspberry Pi 5). Toolchain: qcc/q++ (`gcc_ntox86_64`).
 
 ## Layout
-See `docs/architecture.svg`, `docs/dashboard.html` (live copy: https://relmw.elidot.com) and the header comments in `include/relmw/*.hpp`. The core (`src/core`) has no OS
+See `docs/architecture.svg`, `docs/dashboard.html` and the header comments in `include/relmw/*.hpp`. The core (`src/core`) has no OS
 calls and is shared by both platforms; QNX-specific code is isolated under `#ifdef __QNX__`.
 
 ## Provenance
