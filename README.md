@@ -91,6 +91,19 @@ CPU-affinity and plan unit tests, the QNX syntax check, and the dashboard / LLM-
 scripts/qnx_syntax_check.sh    # g++ -fsyntax-only -D__QNX__ against tools/qnx_stubs (8.0 signatures) + stub self-test
 ```
 
+### Run the QNX code path on Linux — QNX API simulation on Linux, not QNX
+`compat/qnx_sim/` simulates, in user space, the QNX 8.0 calls relmw uses (channels, `MsgSend/MsgReceive/MsgReply`,
+pulses, `timer_create` → pulse, a minimal resource manager and slog2), so the same `#ifdef __QNX__` sources compile, link
+and run end to end on Linux:
+```bash
+cmake -G Ninja -S . -B build-sim -DRELMW_QNX_SIM=ON && cmake --build build-sim
+ctest --test-dir build-sim     # 14 tests: simulated-API unit tests, /dev/relmw via relmwctl, relmw_robotd remote ==
+                               # in-process + crash recovery, bench byte-identical to results/host_linux
+```
+Binaries built this way report `QNX API simulation on Linux (not QNX)` in `status`, slog2 and stdout. **They are not QNX
+measurements**: no priority inheritance, no kernel blocking states, no secure-event validation, no secpol, no HAM, and
+the timer is a Linux thread. See `compat/qnx_sim/README.md` for the full list of differences with links to the 8.0 docs.
+
 ## Build and run (QNX SDP 8.0, QEMU x86_64) — to be validated
 One command after the SDP is installed (build → image → boot → tests, bench, RT runs, resmgr demo, slog2, HAM → collect):
 ```bash
@@ -111,7 +124,7 @@ QNX version: QNX SDP 8.0 (QNX Everywhere non-commercial license). Target: QEMU x
 file provided for Raspberry Pi 5). Toolchain: qcc/q++ (`gcc_ntox86_64`).
 
 ## Layout
-See `docs/architecture.svg`, `docs/dashboard.html` and the header comments in `include/relmw/*.hpp`. The core (`src/core`) has no OS
+See `docs/architecture.svg`, `docs/dashboard.html` (live copy: https://relmw.elidot.com) and the header comments in `include/relmw/*.hpp`. The core (`src/core`) has no OS
 calls and is shared by both platforms; QNX-specific code is isolated under `#ifdef __QNX__`.
 
 ## Provenance
