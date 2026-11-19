@@ -12,6 +12,11 @@
 
 ![architecture](docs/architecture.svg)
 
+## Hands-on 6-Step QNX OS 8.0 Codelab (`Best Codelab / Tutorial`)
+- **Developer Markdown Codelab:** [`docs/codelab/CODELAB.md`](docs/codelab/CODELAB.md) — 60-minute hands-on walkthrough covering `MsgReceivePulse` + `ChannelCreate(_NTO_CHF_PRIVATE)` + `SCHED_SPORADIC` + `pthread_cluster_set`, O(1) zero-allocation Simplex CBF safety shield (`SafetyShield::project()`), `/dev/relmw` & `/dev/robot0` (`resmgr_attach` + `_IO_MSG`), dual-layer `HAM` self-healing, `slog2`, 128-byte CRC-32 ROS 2 telemetry, and least-privilege `secpol` hardening, with concrete verification checkpoints at every step.
+- **Interactive Zero-CDN Web Codelab:** [`docs/codelab/index.html`](docs/codelab/index.html) — offline interactive guide with one-click copy-code buttons, persistent step progress tracker, live **1 kHz Timing/Jitter & `SCHED_SPORADIC` Budget Verifier**, interactive **Simplex CBF Safety Shield Sandbox**, and **QNX 8.0 `secpol` Access Checker**.
+- **Interactive Dual-Screen Replay Dashboard:** [`docs/dashboard.html`](docs/dashboard.html) · **Demo Video (2m 41s):** [YouTube](https://youtu.be/kLAHQDBODiU)
+
 ## What it does
 Learned robot policies fail in the long tail, and their failures are **correlated**: after a plain
 rollback the robot sees almost the same situation and repeats the same mistake. `relmw` wraps *any*

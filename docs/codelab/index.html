@@ -1,0 +1,2035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>relmw-qnx — 6-Step QNX OS 8.0 Simplex Safety Supervisor Codelab</title>
+<meta name="description" content="Hands-on 6-step QNX OS 8.0 developer codelab: build a 1 kHz zero-allocation Simplex physical safety shield and robot reliability supervisor with MsgReceivePulse, resmgr_attach, HAM, slog2, and secpol.">
+<style>
+:root{
+  --bg:#F6F4EF;
+  --surface:#FFFFFF;
+  --surface-2:#FBFAF7;
+  --surface-3:#EFECE5;
+  --graphite:#1C1917;
+  --graphite-2:#26221E;
+  --graphite-3:#332E29;
+  --graphite-4:#46403A;
+  --ink:#1C1917;
+  --ink-2:#524E46;
+  --ink-3:#7D776C;
+  --line:#E3E0D8;
+  --line-2:#D6D1C6;
+  --accent:#C2410C;
+  --accent-hover:#A9380A;
+  --accent-soft:#FFF4ED;
+  --accent-border:#F2C9B2;
+  --amber:#B45309;
+  --amber-bright:#D97706;
+  --amber-gold:#9A6700;
+  --amber-bg:#FBF3E4;
+  --amber-line:#E7D3B0;
+  --ok:#2F7D4F;
+  --ok-bg:#EEF6F0;
+  --ok-line:#B7D7C2;
+  --bad:#B42318;
+  --bad-bg:#FDF2F1;
+  --bad-line:#E6B8B5;
+  --code-fg:#F2ECE1;
+  --code-dim:#A8A095;
+  --code-kw:#F59E0B;
+  --code-fn:#FDBA74;
+  --code-str:#86C79A;
+  --code-num:#E8845A;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:92px}
+body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.skip{position:absolute;left:-9999px;top:8px;background:var(--surface);color:var(--ink);padding:8px 12px;border:1px solid var(--line-2);border-radius:8px;z-index:50}
+.skip:focus{left:12px}
+.ph{width:1.15em;height:1.15em;flex:none;vertical-align:-0.2em}
+.mono{font-family:var(--mono)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* Sticky Top Industrial Bar */
+header.topbar{
+  position:sticky;top:0;z-index:30;
+  background:var(--graphite);color:#F6F4EF;
+  border-bottom:2px solid var(--accent);
+}
+.topbar-in{
+  max-width:1380px;margin:0 auto;padding:10px 20px;
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;
+}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px;color:#FFFFFF;white-space:nowrap}
+.brand .mark{color:#F59E0B;display:inline-flex;align-items:center}
+.brand .sub{color:#B8AFA4;font-weight:500}
+.pill{
+  display:inline-flex;align-items:center;gap:6px;
+  font:600 11px/1 var(--mono);letter-spacing:.05em;text-transform:uppercase;
+  padding:5px 9px;border-radius:999px;white-space:nowrap;
+}
+.pill.amber{background:#3A2A1A;color:#FDBA74;border:1px solid #6E4720}
+.pill.ok{background:#1B3526;color:#86C79A;border:1px solid #2F6646}
+.pill.light-amber{background:var(--amber-bg);color:var(--amber-gold);border:1px solid var(--amber-line)}
+.pill.light-ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-line)}
+.pill.light-bad{background:var(--bad-bg);color:var(--bad);border:1px solid var(--bad-line)}
+.pill.light-accent{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-border)}
+
+.top-progress{display:flex;align-items:center;gap:10px;margin-left:auto}
+.pbar-wrap{width:128px;height:7px;background:var(--graphite-3);border-radius:999px;overflow:hidden}
+.pbar-fill{height:100%;width:0%;background:linear-gradient(90deg,#D97706,#C2410C);transition:width .25s ease}
+.top-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.tbtn{
+  display:inline-flex;align-items:center;gap:6px;
+  font:500 12.5px/1 var(--sans);color:#F2ECE1;background:var(--graphite-2);
+  border:1px solid var(--graphite-4);border-radius:7px;padding:7px 11px;cursor:pointer;min-height:34px;
+  text-decoration:none;
+}
+.tbtn:hover{background:var(--graphite-3);border-color:#6E645A;text-decoration:none}
+.tbtn[aria-pressed="true"],.tbtn.primary{background:var(--accent);border-color:var(--accent);color:#FFFFFF}
+.tbtn.primary:hover{background:var(--accent-hover)}
+
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  font:600 13px/1 var(--sans);color:var(--ink);background:var(--surface);
+  border:1px solid var(--line-2);border-radius:8px;padding:9px 13px;cursor:pointer;min-height:36px;
+  text-decoration:none;
+}
+.btn:hover{border-color:#B5AEA2;background:var(--surface-2);text-decoration:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#FFFFFF}
+.btn.primary:hover{background:var(--accent-hover)}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:#FFFFFF}
+.btn.ok:hover{background:#25663F}
+.btn.sm{font-size:12px;padding:6px 10px;min-height:30px;border-radius:6px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* Mobile Stepper Strip */
+.mob-stepper{display:none;background:var(--surface);border-bottom:1px solid var(--line);padding:8px 14px;overflow-x:auto;gap:6px}
+.mob-step-btn{
+  flex:none;display:inline-flex;align-items:center;gap:6px;
+  font:600 12px/1 var(--mono);padding:7px 10px;border-radius:7px;
+  border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);cursor:pointer;
+}
+.mob-step-btn.active{background:var(--graphite);color:#FFFFFF;border-color:var(--graphite)}
+.mob-step-btn.done{border-color:var(--ok-line);background:var(--ok-bg);color:var(--ok)}
+
+/* Main Grid Shell */
+.shell{
+  max-width:1380px;margin:0 auto;padding:22px 20px 64px;
+  display:grid;grid-template-columns:284px minmax(0,1fr);gap:28px;align-items:start;
+}
+main,.wgrid>*,article.step-card,.step-top>div,.callout>div,label.chk-row>span{min-width:0}
+code.inline,label.chk-row .cmd{overflow-wrap:anywhere}
+
+/* Left Sidebar Stepper */
+aside.sidebar{
+  position:sticky;top:76px;
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:16px;
+}
+.side-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.side-head h2{margin:0;font:700 12px/1.2 var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2)}
+.side-time{font:600 11.5px/1 var(--mono);color:var(--amber-gold)}
+.side-meter{height:8px;background:var(--surface-3);border-radius:999px;overflow:hidden;margin-bottom:14px}
+.side-meter > i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--amber-bright),var(--accent));transition:width .25s ease}
+
+ol.step-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.step-nav-btn{
+  width:100%;text-align:left;display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:9px;align-items:center;
+  padding:9px 10px;border-radius:9px;border:1px solid transparent;background:transparent;cursor:pointer;
+  color:var(--ink-2);font:500 13px/1.3 var(--sans);transition:background .15s,border-color .15s;
+}
+.step-nav-btn:hover{background:var(--surface-2);color:var(--ink);border-color:var(--line)}
+.step-nav-btn.active{background:var(--accent-soft);border-color:var(--accent-border);color:var(--ink);font-weight:650}
+.step-nav-btn .num{
+  width:26px;height:26px;border-radius:7px;display:grid;place-items:center;
+  font:700 11.5px/1 var(--mono);background:var(--surface-3);color:var(--ink-2);border:1px solid var(--line);
+}
+.step-nav-btn.active .num{background:var(--accent);color:#FFFFFF;border-color:var(--accent)}
+.step-nav-btn.done .num{background:var(--ok);color:#FFFFFF;border-color:var(--ok)}
+.step-nav-btn .stitle{display:block;overflow:hidden;text-overflow:ellipsis}
+.step-nav-btn .smeta{display:block;font:500 11px/1.2 var(--mono);color:var(--ink-3);margin-top:2px}
+.step-nav-btn .chk-frac{font:600 11px/1 var(--mono);color:var(--ink-3)}
+.step-nav-btn.done .chk-frac{color:var(--ok)}
+
+.side-divider{height:1px;background:var(--line);margin:14px 0}
+.side-tools{display:grid;gap:6px}
+.side-tools .lab{font:700 11px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:2px}
+.tool-jump{
+  display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;
+  border:1px solid var(--line);background:var(--surface-2);color:var(--ink);font:500 12.5px/1.2 var(--sans);
+  cursor:pointer;text-align:left;
+}
+.tool-jump:hover{border-color:var(--accent-border);background:var(--accent-soft)}
+.side-foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:11.5px;color:var(--ink-3)}
+.link-reset{background:none;border:0;color:var(--ink-2);font:600 11.5px/1 var(--sans);cursor:pointer;padding:4px 0;text-decoration:underline}
+.link-reset:hover{color:var(--bad)}
+
+/* Hero Intro Banner */
+.hero{
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:22px 24px;margin-bottom:20px;position:relative;overflow:hidden;
+}
+.hero::before{
+  content:"";position:absolute;left:0;top:0;right:0;height:4px;
+  background:linear-gradient(90deg,var(--graphite) 0%,var(--accent) 55%,var(--amber-bright) 100%);
+}
+.hero-eyebrow{
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px;
+  font:700 11.5px/1.2 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--amber-gold);
+}
+.hero h1{margin:0 0 8px;font-size:28px;line-height:1.18;letter-spacing:-.02em;font-weight:750}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero .lede{margin:0 0 14px;color:var(--ink-2);max-width:78ch;font-size:15px}
+.hero-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}
+.hstat{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+.hstat .k{font:600 10.5px/1.2 var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3)}
+.hstat .v{font:700 19px/1.2 var(--sans);font-variant-numeric:tabular-nums;margin-top:4px;color:var(--ink)}
+.hstat .v.acc{color:var(--accent)}
+.hstat .v.ok{color:var(--ok)}
+.hstat .s{font-size:11.5px;color:var(--ink-2);margin-top:2px}
+
+/* Completion Banner */
+.complete-banner{
+  display:none;margin-bottom:20px;padding:16px 20px;border-radius:12px;
+  background:var(--ok-bg);border:1.5px solid var(--ok);color:var(--ink);
+  align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+}
+.complete-banner.show{display:flex}
+.complete-banner h2{margin:0 0 3px;font-size:16px;color:var(--ok);display:flex;align-items:center;gap:8px}
+.complete-banner p{margin:0;font-size:13.5px;color:var(--ink-2)}
+
+/* Step Article Cards */
+article.step-card{
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:24px 26px;margin-bottom:22px;
+}
+body.mode-single article.step-card{display:none}
+body.mode-single article.step-card.active{display:block}
+.step-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.step-kicker{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.step-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--graphite);color:#FDBA74;font:700 11.5px/1 var(--mono);
+  padding:6px 10px;border-radius:7px;letter-spacing:.05em;text-transform:uppercase;
+}
+.step-card h2{margin:8px 0 4px;font-size:22px;line-height:1.25;letter-spacing:-.015em}
+.step-goal{margin:0;color:var(--ink-2);font-size:14.5px}
+.api-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.api-tag{
+  font:600 11.5px/1 var(--mono);padding:4px 8px;border-radius:6px;
+  background:var(--surface-3);color:var(--ink);border:1px solid var(--line-2);
+}
+h3{font-size:15.5px;font-weight:700;margin:20px 0 8px;color:var(--ink)}
+p{margin:0 0 11px}
+ul,ol.prose{margin:0 0 12px;padding-left:20px}
+li{margin-bottom:5px}
+code.inline{
+  font-family:var(--mono);font-size:12.5px;background:var(--surface-3);color:var(--ink);
+  padding:1.5px 5px;border-radius:5px;border:1px solid var(--line);
+}
+
+/* Callouts */
+.callout{
+  display:flex;gap:11px;align-items:flex-start;
+  padding:13px 15px;border-radius:10px;margin:14px 0;font-size:13.5px;
+  border:1px solid var(--amber-line);background:var(--amber-bg);color:var(--ink);
+}
+.callout.warn{border-color:var(--bad-line);background:var(--bad-bg)}
+.callout.ok{border-color:var(--ok-line);background:var(--ok-bg)}
+.callout .ic{margin-top:2px;color:var(--amber-gold)}
+.callout.warn .ic{color:var(--bad)}
+.callout.ok .ic{color:var(--ok)}
+.callout strong{color:var(--ink)}
+
+/* Dark Warm-Graphite Code Blocks with Copy Button */
+.code-wrap{
+  margin:14px 0;border-radius:10px;overflow:hidden;
+  border:1px solid var(--graphite-3);background:var(--graphite-2);
+}
+.code-bar{
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 10px;
+  padding:7px 12px;background:var(--graphite);border-bottom:1px solid var(--graphite-3);
+}
+.code-meta{display:flex;align-items:center;gap:8px;font:600 11.5px/1 var(--mono);color:#D6CEC2}
+.code-lang{
+  font:700 10px/1 var(--mono);letter-spacing:.05em;text-transform:uppercase;
+  padding:3px 6px;border-radius:4px;background:#3A2A1A;color:#FDBA74;border:1px solid #6E4720;
+}
+.code-lang.target{background:#3E1E19;color:#F5A39B;border-color:#7A3229}
+.code-lang.cpp{background:#233529;color:#86C79A;border-color:#355942}
+.copy-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  font:600 11.5px/1 var(--mono);color:#F2ECE1;background:var(--graphite-3);
+  border:1px solid var(--graphite-4);border-radius:6px;padding:5px 9px;cursor:pointer;
+}
+.copy-btn:hover{background:var(--graphite-4);border-color:#8A7E71}
+.copy-btn.copied{background:var(--ok);border-color:var(--ok);color:#FFFFFF}
+pre.code{
+  margin:0;padding:14px 16px;overflow-x:auto;
+  font:12.8px/1.55 var(--mono);color:var(--code-fg);tab-size:2;
+}
+.tok-c{color:var(--code-dim)}
+.tok-k{color:var(--code-kw);font-weight:600}
+.tok-f{color:var(--code-fn)}
+.tok-s{color:var(--code-str)}
+.tok-n{color:var(--code-num)}
+
+/* Tables */
+.tbl-wrap{overflow-x:auto;margin:14px 0;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13px;background:var(--surface)}
+th,td{padding:9px 11px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font:700 11px/1.25 var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.hi td{background:var(--accent-soft);font-weight:600}
+
+/* Interactive Widget Panels */
+.widget{
+  margin:18px 0;border:1.5px solid var(--amber-line);border-radius:12px;
+  background:var(--surface-2);padding:16px 18px;
+}
+.widget-head{
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;
+  padding-bottom:11px;margin-bottom:14px;border-bottom:1px solid var(--line);
+}
+.widget-title{display:flex;align-items:center;gap:8px;font:700 14px/1.2 var(--sans);color:var(--ink)}
+.widget-title .ic{color:var(--accent)}
+.preset-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.wgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.wgrid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.field{display:grid;gap:4px}
+.field label{font:600 11.5px/1.2 var(--mono);color:var(--ink-2);display:flex;justify-content:space-between;gap:6px}
+.field input[type="number"],.field select,.field textarea{
+  width:100%;font:12.5px/1.4 var(--mono);padding:7px 9px;border-radius:7px;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink);
+}
+.field input[type="range"]{width:100%;accent-color:var(--accent)}
+.rule-list{display:grid;gap:7px;margin-top:10px}
+.rule-item{
+  display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:8px;
+  font-size:12.5px;border:1px solid var(--line);background:var(--surface);
+}
+.rule-item.pass{border-color:var(--ok-line);background:var(--ok-bg)}
+.rule-item.warn{border-color:var(--amber-line);background:var(--amber-bg)}
+.rule-item.fail{border-color:var(--bad-line);background:var(--bad-bg)}
+.rule-item .rtag{font:700 10.5px/1 var(--mono);padding:3px 6px;border-radius:4px;flex:none;margin-top:1px}
+.rule-item.pass .rtag{background:var(--ok);color:#FFFFFF}
+.rule-item.warn .rtag{background:var(--amber);color:#FFFFFF}
+.rule-item.fail .rtag{background:var(--bad);color:#FFFFFF}
+
+.svg-box{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px}
+.svg-box svg{display:block;width:100%;height:auto}
+.cbf-stage{cursor:crosshair;touch-action:none}
+.kv-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.kv{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:12px/1.35 var(--mono)}
+.kv span{display:block;font-size:10.5px;color:var(--ink-3);text-transform:uppercase}
+.kv b{font-size:13px;color:var(--ink)}
+
+/* Verification Checkpoints Box */
+.checkpoint{
+  margin-top:20px;border:1.5px solid var(--ok-line);border-radius:12px;
+  background:var(--ok-bg);padding:15px 18px;
+}
+.checkpoint-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.checkpoint-head h3{margin:0;font:700 13.5px/1.2 var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--ok);display:flex;align-items:center;gap:7px}
+.chk-items{display:grid;gap:8px}
+label.chk-row{
+  display:flex;align-items:flex-start;gap:10px;padding:9px 11px;border-radius:8px;
+  background:var(--surface);border:1px solid var(--ok-line);cursor:pointer;font-size:13px;
+}
+label.chk-row input{width:17px;height:17px;margin-top:2px;accent-color:var(--ok);flex:none}
+label.chk-row.checked{background:#F7FAF8;border-color:var(--ok)}
+label.chk-row .cmd{display:block;font:600 12px/1.35 var(--mono);color:var(--ink);margin-top:3px}
+label.chk-row .exp{display:block;font-size:12px;color:var(--ink-2);margin-top:2px}
+
+/* Step Footer */
+.step-foot{
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;
+  margin-top:20px;padding-top:16px;border-top:1px solid var(--line);
+}
+.live-toast{
+  position:fixed;bottom:18px;right:18px;z-index:60;
+  background:var(--graphite);color:#F6F4EF;border:1px solid var(--accent);
+  padding:9px 14px;border-radius:9px;font:600 12.5px/1.2 var(--mono);
+  box-shadow:0 8px 24px rgba(28,25,23,.25);
+  opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .2s,transform .2s;
+}
+.live-toast.show{opacity:1;transform:translateY(0)}
+
+footer.page-foot{
+  max-width:1380px;margin:0 auto;padding:18px 20px 44px;
+  border-top:1px solid var(--line);color:var(--ink-2);font-size:12.5px;
+  display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;
+}
+
+@media (max-width:1080px){
+  .shell{grid-template-columns:minmax(0,1fr);padding-top:14px}
+  aside.sidebar{display:none}
+  .mob-stepper{display:flex}
+  .hero-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .wgrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:640px){
+  .topbar-in{padding:10px 14px}
+  .top-progress{margin-left:0;width:100%;justify-content:space-between}
+  .hero{padding:18px 16px}
+  .hero h1{font-size:22px}
+  .hero-stats,.wgrid-3,.kv-grid{grid-template-columns:minmax(0,1fr)}
+  article.step-card{padding:18px 16px}
+}
+@media print{
+  header.topbar,.mob-stepper,aside.sidebar,.step-foot,.copy-btn,.preset-row,.live-toast{display:none!important}
+  body{background:#FFFFFF}
+  .shell{display:block;padding:0}
+  body.mode-single article.step-card{display:block!important;break-inside:avoid}
+  article.step-card,.hero,.widget{border-color:#CCCCCC}
+}
+</style>
+</head>
+<body class="mode-single">
+<a class="skip" href="#codelab-main">Skip to codelab content</a>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="brand">
+      <span class="mark"><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M240,128a8,8,0,0,1-8,8H204.94l-37.78,75.58A8,8,0,0,1,160,216h-.4a8,8,0,0,1-7.08-5.14L95.35,60.76,63.28,131.31A8,8,0,0,1,56,136H24a8,8,0,0,1,0-16H50.85L88.72,36.69a8,8,0,0,1,14.76.46l57.51,151,31.85-63.71A8,8,0,0,1,200,120h32A8,8,0,0,1,240,128Z"/></svg></span>
+      <span>elidot</span><span class="sub">· relmw-qnx</span>
+    </div>
+    <span class="pill amber">
+      <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M232,48H160a40,40,0,0,0-32,16A40,40,0,0,0,96,48H24a8,8,0,0,0-8,8V200a8,8,0,0,0,8,8H96a24,24,0,0,1,24,24,8,8,0,0,0,16,0,24,24,0,0,1,24-24h72a8,8,0,0,0,8-8V56A8,8,0,0,0,232,48ZM96,192H32V64H96a24,24,0,0,1,24,24V200A39.81,39.81,0,0,0,96,192Zm128,0H160a39.81,39.81,0,0,0-24,8V88a24,24,0,0,1,24-24h64Z"/></svg>
+      QNX OS 8.0 Codelab · 6 Steps
+    </span>
+    <span class="pill ok" id="top-prog-pill">0 / 6 Verified</span>
+    <div class="top-progress">
+      <div class="pbar-wrap" aria-hidden="true"><div class="pbar-fill" id="top-pbar"></div></div>
+      <div class="top-actions" role="toolbar" aria-label="Codelab view and links">
+        <button type="button" class="tbtn" id="btn-mode-toggle" aria-pressed="false">All 6 Steps</button>
+        <a class="tbtn" href="CODELAB.md">Markdown</a>
+        <a class="tbtn" href="../dashboard.html">Dashboard</a>
+        <button type="button" class="tbtn" id="btn-print">Print</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<nav class="mob-stepper" id="mob-stepper" aria-label="Codelab steps (mobile)"></nav>
+
+<div class="shell">
+  <aside class="sidebar" aria-label="Codelab step progress">
+    <div class="side-head">
+      <h2>Step Progress</h2>
+      <span class="side-time" id="side-remaining">60 min left</span>
+    </div>
+    <div class="side-meter" aria-hidden="true"><i id="side-pbar"></i></div>
+    <ol class="step-list" id="side-step-list"></ol>
+    <div class="side-divider"></div>
+    <div class="side-tools">
+      <div class="lab">Interactive Labs</div>
+      <button type="button" class="tool-jump" data-jump-step="2" data-jump-id="widget-timing">
+        <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M128,40a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,40Zm0,176a80,80,0,1,1,80-80A80.09,80.09,0,0,1,128,216ZM173.66,90.34a8,8,0,0,1,0,11.32l-40,40a8,8,0,0,1-11.32-11.32l40-40A8,8,0,0,1,173.66,90.34ZM96,16a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H104A8,8,0,0,1,96,16Z"/></svg>
+        1 kHz Timing &amp; Jitter Verifier
+      </button>
+      <button type="button" class="tool-jump" data-jump-step="3" data-jump-id="widget-cbf">
+        <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.26,47,25.53a8,8,0,0,0,4.2,0c1-.27,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.25,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0ZM82.34,141.66a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32l-56,56a8,8,0,0,1-11.32,0Z"/></svg>
+        Simplex CBF Shield Sandbox
+      </button>
+      <button type="button" class="tool-jump" data-jump-step="6" data-jump-id="widget-secpol">
+        <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M40,88H73a32,32,0,0,0,62,0h81a8,8,0,0,0,0-16H135a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16Zm64-24A16,16,0,1,1,88,80,16,16,0,0,1,104,64ZM216,168H199a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16h97a32,32,0,0,0,62,0h17a8,8,0,0,0,0-16Zm-48,24a16,16,0,1,1,16-16A16,16,0,0,1,168,192Z"/></svg>
+        QNX 8.0 secpol Policy Checker
+      </button>
+    </div>
+    <div class="side-foot">
+      <span id="side-pct">0% complete</span>
+      <button type="button" class="link-reset" id="btn-reset-progress">Reset</button>
+    </div>
+  </aside>
+
+  <main id="codelab-main" tabindex="-1">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-eyebrow">
+        <span>BlackBerry QNX Global Hackathon</span>
+        <span>·</span>
+        <span>Robotics &amp; Medical + Best Codelab / Tutorial</span>
+        <span>·</span>
+        <span>Apache-2.0</span>
+      </div>
+      <h1 id="hero-title">Build a <em>1 kHz Zero-Allocation</em> Simplex Safety Supervisor on QNX OS 8.0</h1>
+      <p class="lede">
+        A complete 6-step hands-on engineering tutorial covering QNX OS 8.0 <code class="inline">MsgReceivePulse</code> real-time control loops,
+        <code class="inline">resmgr_attach</code> device virtualisation, <code class="inline">HAM</code> dual-layer self-healing,
+        <code class="inline">slog2</code> structured telemetry, least-privilege <code class="inline">secpol</code> hardening, and an O(1) Supporting-Hyperplane Control Barrier Function (CBF) safety shield.
+      </p>
+      <div class="callout">
+        <span class="ic"><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM222.93,203.8a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z"/></svg></span>
+        <div>
+          <strong>Engineering Honesty Boundary:</strong> Every benchmark metric and command output in this Codelab comes from real compiled runs of
+          <code class="inline">relmw-qnx</code> (<code class="inline">-std=c++17 -O2 -Wall -Wextra -Werror</code>, 39/39 test suites PASS).
+          <code class="inline">compat/qnx_sim/</code> compiles and executes the actual <code class="inline">#ifdef __QNX__</code> files on Linux/macOS to rehearse IPC and control flow; it is <strong>not</strong> a QNX kernel latency benchmark. Live QNX SDP 8.0 QEMU/hardware metrics are captured on target with <code class="inline">scripts/run_qnx80_evidence_pack.sh</code>.
+        </div>
+      </div>
+      <div class="hero-stats" role="list">
+        <div class="hstat" role="listitem">
+          <div class="k">Hot-Path Heap Allocs</div>
+          <div class="v ok">0 / tick</div>
+          <div class="s">Verified over 100k CBF + 20k MLP calls</div>
+        </div>
+        <div class="hstat" role="listitem">
+          <div class="k">Surgical Zero-Intrusion</div>
+          <div class="v acc">100 / 100</div>
+          <div class="s">0 intrusions vs 1,345 naive retry</div>
+        </div>
+        <div class="hstat" role="listitem">
+          <div class="k">MLP Field Recovery</div>
+          <div class="v">92 / 100</div>
+          <div class="s">+15.0 pp · McNemar p = 0.000275</div>
+        </div>
+        <div class="hstat" role="listitem">
+          <div class="k">Automated Test Gate</div>
+          <div class="v ok">39 / 39</div>
+          <div class="s">22 Host + 17 QNX_SIM · 0 warnings</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="complete-banner" id="complete-banner" role="status" aria-live="polite">
+      <div>
+        <h2>
+          <svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>
+          All 6 QNX OS 8.0 Codelab Steps Verified
+        </h2>
+        <p>You have verified the full QNX 8.0 Simplex supervisor pipeline: pulse loop, 0-alloc CBF shield, /dev resource managers, HAM + slog2, ROS 2 telemetry, and secpol hardening.</p>
+      </div>
+      <a class="btn ok" href="../dashboard.html">Open Dual-Screen Replay Dashboard</a>
+    </div>
+
+    <!-- ==================== STEP 1 ==================== -->
+    <article class="step-card active" id="step-1" data-step="1" data-title="Dual-Target Build &amp; QNX 8.0 Gate" data-mins="10">
+      <div class="step-top">
+        <div>
+          <div class="step-kicker">
+            <span class="step-badge">Step 01 / 06</span>
+            <span class="pill light-amber">10 min</span>
+            <span class="pill light-ok" data-step-badge="1">In Progress</span>
+          </div>
+          <h2>Workspace Setup, Dual-Target Build &amp; Strict QNX 8.0 Syntax Gate</h2>
+          <p class="step-goal">Separate portable C++17 safety math from QNX 8.0 microkernel syscalls, compile both POSIX and <code class="inline">RELMW_QNX_SIM</code> with <code class="inline">-Werror</code>, and prove all 12 QNX translation units pass clean-room 8.0 signature checks.</p>
+          <div class="api-tags">
+            <span class="api-tag">-D__QNX__ -fsyntax-only</span>
+            <span class="api-tag">-DRELMW_QNX_SIM=ON</span>
+            <span class="api-tag">scripts/build_direct.sh</span>
+            <span class="api-tag">tests/test_rt_noalloc.cpp</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>1.1 Microkernel Two-Process Architecture</h3>
+      <p>
+        Rather than packing neural inference, physical safety filtering, device I/O, and operator CLI into one fragile process,
+        <code class="inline">relmw-qnx</code> splits the cell across two isolated QNX OS 8.0 microkernel processes supervised by HAM and hardened by <code class="inline">secpol</code>:
+      </p>
+
+      <div class="svg-box">
+        <svg viewBox="0 0 920 265" role="img" aria-label="QNX OS 8.0 two-process microkernel architecture diagram">
+          <defs>
+            <marker id="arr-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#524E46"/></marker>
+            <marker id="arr-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#C2410C"/></marker>
+            <marker id="arr-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2F7D4F"/></marker>
+            <marker id="arr-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#B42318"/></marker>
+          </defs>
+          <rect x="0" y="0" width="920" height="265" rx="8" fill="#FBFAF7"/>
+          <!-- Operator -->
+          <rect x="14" y="24" width="166" height="96" rx="8" fill="#FFFFFF" stroke="#D6D1C6" stroke-width="1.5"/>
+          <text x="26" y="46" font-size="10.5" font-weight="700" fill="#524E46" font-family="ui-monospace,monospace">relmw_operator_t</text>
+          <text x="26" y="68" font-size="12" font-weight="700" fill="#1C1917">Operator / HMI</text>
+          <text x="26" y="88" font-size="10.5" fill="#524E46" font-family="ui-monospace,monospace">cat /dev/relmw/status</text>
+          <text x="26" y="106" font-size="10.5" fill="#524E46" font-family="ui-monospace,monospace">echo "shield on" &gt; ctl</text>
+
+          <!-- ROS 2 Bridge -->
+          <rect x="14" y="142" width="166" height="98" rx="8" fill="#EEF6F0" stroke="#2F7D4F" stroke-width="1.5"/>
+          <text x="26" y="164" font-size="10.5" font-weight="700" fill="#2F7D4F" font-family="ui-monospace,monospace">128-B CRC-32 UDP</text>
+          <text x="26" y="186" font-size="12" font-weight="700" fill="#1C1917">ROS 2 / Replay</text>
+          <text x="26" y="205" font-size="10.5" fill="#524E46" font-family="ui-monospace,monospace">/relmw/diagnostics</text>
+          <text x="26" y="223" font-size="10.5" fill="#524E46" font-family="ui-monospace,monospace">docs/dashboard.html</text>
+
+          <!-- Supervisor Process -->
+          <rect x="228" y="16" width="414" height="232" rx="10" fill="#FFFFFF" stroke="#1C1917" stroke-width="2"/>
+          <text x="244" y="38" font-size="13" font-weight="700" fill="#1C1917">relmw_supervisor</text>
+          <text x="380" y="38" font-size="10.5" fill="#9A6700" font-family="ui-monospace,monospace">type: relmw_supervisor_t · uid 1001</text>
+
+          <rect x="244" y="50" width="174" height="84" rx="7" fill="#FBFAF7" stroke="#D6D1C6"/>
+          <text x="254" y="69" font-size="10" font-weight="700" fill="#524E46" font-family="ui-monospace,monospace">RESMGR THREAD</text>
+          <text x="254" y="88" font-size="11" font-family="ui-monospace,monospace" fill="#1C1917">/dev/relmw/*</text>
+          <text x="254" y="106" font-size="10.5" fill="#524E46">resmgr_attach · io_read64</text>
+          <text x="254" y="122" font-size="10.5" fill="#524E46">qnx_resmgr.cpp</text>
+
+          <rect x="430" y="50" width="198" height="126" rx="7" fill="#FFF4ED" stroke="#C2410C" stroke-width="1.8"/>
+          <text x="440" y="69" font-size="10" font-weight="700" fill="#C2410C" font-family="ui-monospace,monospace">1 kHz CONTROL THREAD</text>
+          <text x="440" y="88" font-size="11" font-weight="700" fill="#1C1917">MsgReceivePulse() · _cpu-1</text>
+          <text x="440" y="106" font-size="10.5" fill="#524E46">TinyMLPPolicy (FP32 / Q12)</text>
+          <text x="440" y="123" font-size="10.5" font-weight="700" fill="#C2410C">SafetyShield::project() O(1)</text>
+          <text x="440" y="140" font-size="10.5" fill="#524E46">CBF Circle+Polygon · 0 alloc</text>
+          <text x="440" y="157" font-size="10.5" fill="#524E46">Correlation-Aware Retry</text>
+
+          <rect x="244" y="146" width="174" height="86" rx="7" fill="#FBFAF7" stroke="#D6D1C6"/>
+          <text x="254" y="165" font-size="10" font-weight="700" fill="#524E46" font-family="ui-monospace,monospace">PERSISTENT STATE</text>
+          <text x="254" y="184" font-size="10.5" fill="#1C1917">Beta Failure Library</text>
+          <text x="254" y="201" font-size="10.5" fill="#524E46">atomic tmp + rename</text>
+          <text x="254" y="218" font-size="10.5" fill="#524E46">slog2 "relmw" (8x4 KB)</text>
+
+          <rect x="430" y="186" width="198" height="46" rx="7" fill="#FBF3E4" stroke="#E7D3B0"/>
+          <text x="440" y="205" font-size="10" font-weight="700" fill="#9A6700" font-family="ui-monospace,monospace">SCHED_FIFO / SPORADIC</text>
+          <text x="440" y="222" font-size="10.5" fill="#524E46">explicit pulse prio 40</text>
+
+          <!-- Robot Driver -->
+          <rect x="702" y="114" width="204" height="134" rx="10" fill="#FFFFFF" stroke="#1C1917" stroke-width="2"/>
+          <text x="716" y="136" font-size="13" font-weight="700" fill="#1C1917">relmw_robotd</text>
+          <text x="716" y="154" font-size="10" fill="#9A6700" font-family="ui-monospace,monospace">relmw_robotd_t · /dev/robot0</text>
+          <text x="716" y="176" font-size="10.5" fill="#524E46">_IO_MSG fixed 64-B / 88-B</text>
+          <text x="716" y="194" font-size="10.5" fill="#524E46">_NTO_CHF_INHERIT_RUNMASK</text>
+          <text x="716" y="212" font-size="10.5" fill="#524E46">Deterministic PushSim2D</text>
+          <text x="716" y="230" font-size="10.5" fill="#2F7D4F" font-weight="700">Survives kill -9 reconnect</text>
+
+          <!-- HAM -->
+          <rect x="702" y="16" width="204" height="80" rx="10" fill="#FDF2F1" stroke="#B42318" stroke-width="1.8"/>
+          <text x="716" y="37" font-size="10.5" font-weight="700" fill="#B42318" font-family="ui-monospace,monospace">QNX HAM (ham_t)</text>
+          <text x="716" y="56" font-size="11" fill="#1C1917">CONDDEATH -&gt; restart</text>
+          <text x="716" y="74" font-size="10.5" fill="#524E46">HBEATMISSEDHIGH -&gt; slay</text>
+          <text x="716" y="88" font-size="10" fill="#7D776C" font-family="ui-monospace,monospace">apps/relmw_ham_setup.cpp</text>
+
+          <!-- Arrows -->
+          <path d="M180,74 L240,74" stroke="#524E46" stroke-width="2" fill="none" marker-end="url(#arr-dark)"/>
+          <path d="M244,192 L184,192" stroke="#2F7D4F" stroke-width="2" fill="none" marker-end="url(#arr-ok)"/>
+          <path d="M628,144 L698,144" stroke="#C2410C" stroke-width="2.2" fill="none" marker-end="url(#arr-acc)"/>
+          <text x="634" y="136" font-size="10" font-weight="700" fill="#C2410C" font-family="ui-monospace,monospace">MsgSend</text>
+          <path d="M702,172 L632,172" stroke="#C2410C" stroke-width="2.2" fill="none" marker-end="url(#arr-acc)"/>
+          <text x="634" y="187" font-size="10" font-weight="700" fill="#C2410C" font-family="ui-monospace,monospace">MsgReply</text>
+          <path d="M702,56 L646,56" stroke="#B42318" stroke-width="1.8" stroke-dasharray="4 3" fill="none" marker-end="url(#arr-bad)"/>
+          <path d="M804,96 L804,110" stroke="#B42318" stroke-width="1.8" stroke-dasharray="4 3" fill="none" marker-end="url(#arr-bad)"/>
+        </svg>
+      </div>
+
+      <h3>1.2 Clone &amp; Build Both Targets (<code class="inline">build-host</code> + <code class="inline">build-sim</code>)</h3>
+      <div class="code-wrap">
+        <div class="code-bar">
+          <div class="code-meta"><span class="code-lang">bash · host + sim</span><span>Zero-dependency C++17 build &amp; 39-suite test run</span></div>
+          <button type="button" class="copy-btn" data-copy>Copy</button>
+        </div>
+<pre class="code">git clone https://github.com/Qidianyan/relmw-qnx.git
+cd relmw-qnx
+
+<span class="tok-c"># Builds POSIX host (build-host) + -D__QNX__ simulation (build-sim) with -Wall -Wextra -Werror</span>
+CXX=clang++ bash scripts/build_direct.sh all</pre>
+      </div>
+
+      <h3>1.3 Verify All 12 QNX 8.0 Translation Units &amp; 9 Negative Stub Guards</h3>
+      <p>
+        <code class="inline">scripts/qnx_syntax_check.sh</code> compiles every QNX file with <code class="inline">-D__QNX__ -fsyntax-only -Wall -Wextra -Werror</code>
+        against clean-room QNX SDP 8.0 headers (<code class="inline">tools/qnx_stubs/include/</code>), verifies no discontinued <code class="inline">__QNXNTO__</code> macros exist, and confirms 9 deliberately malformed QNX calls fail compilation.
+      </p>
+      <div class="code-wrap">
+        <div class="code-bar">
+          <div class="code-meta"><span class="code-lang">bash · static gate</span><span>scripts/qnx_syntax_check.sh</span></div>
+          <button type="button" class="copy-btn" data-copy>Copy</button>
+        </div>
+<pre class="code">CXX=g++ bash scripts/qnx_syntax_check.sh
+<span class="tok-c"># Expected tail:</span>
+<span class="tok-c">#   OK    apps/relmw_robotd.cpp</span>
+<span class="tok-c">#   OK    stub rejects: pthread_cluster_get_runmask() with unsigned*</span>
+<span class="tok-c">#   qnx_syntax_check: all QNX translation units pass -fsyntax-only against 8.0 stubs</span></pre>
+      </div>
+
+      <div class="checkpoint">
+        <div class="checkpoint-head">
+          <h3><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg> Verification Checkpoint 1</h3>
+          <span class="pill light-ok" data-chk-summary="1">0 / 2 checked</span>
+        </div>
+        <div class="chk-items">
+          <label class="chk-row"><input type="checkbox" data-chk="1-a"><span><strong>Dual-target build &amp; 39/39 test suites PASS</strong><span class="cmd">CXX=clang++ bash scripts/build_direct.sh all</span><span class="exp">Expected: ALL 22 HOST TESTS PASSED (0 warnings) &amp; ALL 17 QNX_SIM TESTS PASSED (0 warnings).</span></span></label>
+          <label class="chk-row"><input type="checkbox" data-chk="1-b"><span><strong>Strict QNX 8.0 syntax + 9 negative stub tests PASS</strong><span class="cmd">CXX=g++ bash scripts/qnx_syntax_check.sh &amp;&amp; ./build-sim/test_rt_noalloc</span><span class="exp">Expected: 12/12 QNX units OK, 9/9 wrong calls rejected, 10/10 zero-alloc cases passed.</span></span></label>
+        </div>
+      </div>
+
+      <div class="step-foot">
+        <span class="mono" style="font-size:12px;color:var(--ink-3)">Step 1 of 6</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn ok" data-mark-step="1">Mark Step 1 Verified</button>
+          <button type="button" class="btn primary" data-goto-step="2">Next: Step 2 (Pulse Loop) &rarr;</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- ==================== STEP 2 ==================== -->
+    <article class="step-card" id="step-2" data-step="2" data-title="1 kHz MsgReceivePulse Loop" data-mins="10">
+      <div class="step-top">
+        <div>
+          <div class="step-kicker">
+            <span class="step-badge">Step 02 / 06</span>
+            <span class="pill light-amber">10 min</span>
+            <span class="pill light-amber" data-step-badge="2">Not Started</span>
+          </div>
+          <h2>Deterministic 1 kHz Kernel-Timer Pulse Loop &amp; <code class="inline">SCHED_SPORADIC</code></h2>
+          <p class="step-goal">Wire <code class="inline">ChannelCreate(_NTO_CHF_PRIVATE)</code>, <code class="inline">MsgRegisterEvent</code>, <code class="inline">MsgReceivePulse</code>, budgeted sporadic scheduling, and QNX 8.0 CPU cluster pinning without falling into the <code class="inline">SIGEV_PULSE_PRIO_INHERIT</code> trap.</p>
+          <div class="api-tags">
+            <span class="api-tag">ChannelCreate(_NTO_CHF_PRIVATE)</span>
+            <span class="api-tag">MsgRegisterEvent</span>
+            <span class="api-tag">MsgReceivePulse</span>
+            <span class="api-tag">SCHED_SPORADIC</span>
+            <span class="api-tag">pthread_cluster_set</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>2.1 Private Channel + Secure Kernel-Timer Pulse (<code class="inline">src/platform/qnx/qnx_timer.cpp</code>)</h3>
+      <div class="code-wrap">
+        <div class="code-bar">
+          <div class="code-meta"><span class="code-lang cpp">C++17 · QNX 8.0</span><span>src/platform/qnx/qnx_timer.cpp</span></div>
+          <button type="button" class="copy-btn" data-copy>Copy</button>
+        </div>
+<pre class="code"><span class="tok-c">// Private channel: no external process can ConnectAttach() to inject spoofed ticks.</span>
+impl_-&gt;chid = <span class="tok-f">ChannelCreate</span>(<span class="tok-n">_NTO_CHF_PRIVATE</span>);
+impl_-&gt;coid = <span class="tok-f">ConnectAttach</span>(<span class="tok-n">0</span>, <span class="tok-n">0</span>, impl_-&gt;chid, <span class="tok-n">_NTO_SIDE_CHANNEL</span>, <span class="tok-n">0</span>);
+
+<span class="tok-c">// Read thread priority AFTER set_thread_sched() — NEVER pass SIGEV_PULSE_PRIO_INHERIT!</span>
+<span class="tok-k">struct</span> sched_param cur; <span class="tok-k">int</span> cur_policy = SCHED_OTHER; <span class="tok-k">int</span> prio = <span class="tok-n">10</span>;
+<span class="tok-k">if</span> (<span class="tok-f">pthread_getschedparam</span>(<span class="tok-f">pthread_self</span>(), &amp;cur_policy, &amp;cur) == EOK)
+  prio = cur.sched_priority;
+
+<span class="tok-k">struct</span> sigevent ev;
+<span class="tok-f">SIGEV_PULSE_INIT</span>(&amp;ev, impl_-&gt;coid, prio, kPulseTick, <span class="tok-n">0</span>);
+<span class="tok-f">MsgRegisterEvent</span>(&amp;ev, SYSMGR_COID);       <span class="tok-c">// secure event: kernel/procnto only</span>
+<span class="tok-f">timer_create</span>(CLOCK_MONOTONIC, &amp;ev, &amp;impl_-&gt;timer);
+<span class="tok-f">nsec2timespec</span>(&amp;its.it_value, (uint64_t)period_ns);
+<span class="tok-f">nsec2timespec</span>(&amp;its.it_interval, (uint64_t)period_ns);
+<span class="tok-f">timer_settime</span>(impl_-&gt;timer, <span class="tok-n">0</span>, &amp;its, <span class="tok-k">nullptr</span>);
+
+<span class="tok-c">// Hot loop (0 heap allocations):</span>
+<span class="tok-k">struct</span> _pulse p;
+<span class="tok-f">MsgReceivePulse</span>(impl_-&gt;chid, &amp;p, <span class="tok-k">sizeof</span> p, <span class="tok-k">nullptr</span>);</pre>
+      </div>
+
+      <div class="callout warn">
+        <span class="ic"><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM222.93,203.8a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z"/></svg></span>
+        <div>
+          <strong>QNX 8.0 Priority Pitfall (<code class="inline">SIGEV_PULSE_PRIO_INHERIT</code>):</strong>
+          In QNX SDP 8.0, <code class="inline">SIGEV_PULSE_PRIO_INHERIT</code> makes the receiving thread run at the <em>process's initial priority</em> (typically 10), silently demoting a <code class="inline">SCHED_FIFO 40</code> control thread on every timer tick. Always configure scheduling first, then construct <code class="inline">PeriodicTimer</code> with the thread's explicit priority.
+        </div>
+      </div>
+
+      <!-- INTERACTIVE TIMING & JITTER VERIFIER -->
+      <section class="widget" id="widget-timing" aria-labelledby="wt-title">
+        <div class="widget-head">
+          <div class="widget-title" id="wt-title">
+            <span class="ic"><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M128,40a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,40Zm0,176a80,80,0,1,1,80-80A80.09,80.09,0,0,1,128,216ZM173.66,90.34a8,8,0,0,1,0,11.32l-40,40a8,8,0,0,1-11.32-11.32l40-40A8,8,0,0,1,173.66,90.34ZM96,16a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H104A8,8,0,0,1,96,16Z"/></svg></span>
+            Interactive Lab · 1 kHz Timing, Jitter &amp; <code class="inline">SCHED_SPORADIC</code> Verifier
+          </div>
+          <span class="pill light-amber" id="tv-verdict">Checking…</span>
+        </div>
+
+        <div class="preset-row" role="group" aria-label="Load timing preset">
+          <button type="button" class="btn sm" data-tv-preset="host_idle">Load Measured Linux Idle (p99 262.1 µs)</button>
+          <button type="button" class="btn sm" data-tv-preset="host_load">Load Measured Linux +2 Busy Loops (max 19.3 ms)</button>
+          <button type="button" class="btn sm" data-tv-preset="qnx_budget">Configure QNX 8.0 SCHED_SPORADIC 40/10 + _cpu-1</button>
+          <button type="button" class="btn sm" data-tv-preset="pitfall">Trigger SIGEV_PULSE_PRIO_INHERIT Pitfall</button>
+        </div>
+
+        <div class="wgrid">
+          <div>
+            <div class="wgrid-3">
+              <div class="field">
+                <label for="tv-period">Period T (µs)</label>
+                <input id="tv-period" type="number" min="200" max="10000" step="100" value="1000">
+              </div>
+              <div class="field">
+                <label for="tv-sched">Scheduler</label>
+                <select id="tv-sched">
+                  <option value="fifo">SCHED_FIFO</option>
+                  <option value="sporadic" selected>SCHED_SPORADIC</option>
+                  <option value="rr">SCHED_RR</option>
+                  <option value="other">SCHED_OTHER</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="tv-cluster">QNX Cluster</label>
+                <select id="tv-cluster">
+                  <option value="_cpu-1" selected>_cpu-1 (isolated)</option>
+                  <option value="_cpu-0">_cpu-0</option>
+                  <option value="_all">_all (default)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="wgrid-3" style="margin-top:9px">
+              <div class="field">
+                <label for="tv-prio">High Prio</label>
+                <input id="tv-prio" type="number" min="1" max="255" value="40">
+              </div>
+              <div class="field">
+                <label for="tv-low">Low Prio (SS)</label>
+                <input id="tv-low" type="number" min="1" max="63" value="10">
+              </div>
+              <div class="field">
+                <label for="tv-budget">Budget C (µs)</label>
+                <input id="tv-budget" type="number" min="50" max="9000" step="50" value="500">
+              </div>
+            </div>
+
+            <div class="wgrid-3" style="margin-top:9px">
+              <div class="field">
+                <label for="tv-pulse">Pulse Priority</label>
+                <select id="tv-pulse">
+                  <option value="explicit" selected>Explicit (thread prio)</option>
+                  <option value="inherit">SIGEV_PULSE_PRIO_INHERIT</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="tv-p50">Measured p50 (µs)</label>
+                <input id="tv-p50" type="number" min="1" max="50000" step="0.1" value="60.4">
+              </div>
+              <div class="field">
+                <label for="tv-p99">Measured p99 (µs)</label>
+                <input id="tv-p99" type="number" min="1" max="50000" step="0.1" value="262.1">
+              </div>
+            </div>
+
+            <div class="wgrid-3" style="margin-top:9px">
+              <div class="field">
+                <label for="tv-max">Measured Max (µs)</label>
+                <input id="tv-max" type="number" min="1" max="100000" step="0.1" value="3138.5">
+              </div>
+              <div class="field">
+                <label for="tv-comp">Compute p99 (µs)</label>
+                <input id="tv-comp" type="number" min="0.5" max="10000" step="0.1" value="38.9">
+              </div>
+              <div class="field">
+                <label for="tv-dl">Deadline (% of T)</label>
+                <input id="tv-dl" type="number" min="10" max="100" step="5" value="50">
+              </div>
+            </div>
+
+            <div class="field" style="margin-top:10px">
+              <label for="tv-json">Paste real <code class="inline">rt_report_*.json</code> from QNX 8.0 QEMU or host (optional)</label>
+              <textarea id="tv-json" rows="2" placeholder='{"period_ns":1000000,"sched":"fifo","priority":40,"release_latency":{"p50_ns":18000,"p99_ns":42000,"max_ns":95000},"compute_per_tick":{"p99_ns":24000}}'></textarea>
+              <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+                <button type="button" class="btn sm" id="tv-parse-btn">Import JSON Report</button>
+                <span class="mono" id="tv-json-msg" style="font-size:11.5px;color:var(--ink-2)"></span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="svg-box">
+              <svg id="tv-svg" viewBox="0 0 480 185" role="img" aria-label="Log-scale 1 kHz release latency versus deadline bar chart"></svg>
+            </div>
+            <div class="rule-list" id="tv-rules"></div>
+            <div class="code-wrap" style="margin-top:10px;margin-bottom:0">
+              <div class="code-bar">
+                <div class="code-meta"><span class="code-lang target">generated CLI</span><span>Copy to QNX 8.0 target</span></div>
+                <button type="button" class="copy-btn" data-copy>Copy</button>
+              </div>
+              <pre class="code" id="tv-cmd"></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="checkpoint">
+        <div class="checkpoint-head">
+          <h3><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg> Verification Checkpoint 2</h3>
+          <span class="pill light-ok" data-chk-summary="2">0 / 2 checked</span>
+        </div>
+        <div class="chk-items">
+          <label class="chk-row"><input type="checkbox" data-chk="2-a"><span><strong>O(1) histogram, CPU affinity &amp; simulated QNX pulse loop PASS</strong><span class="cmd">./build-host/test_latency &amp;&amp; ./build-host/test_affinity &amp;&amp; ./build-sim/test_qnx_sim</span><span class="exp">Expected: 7 + 3 + 7 cases passed with 0 failures (pulse grid, stop pulse, cluster runmask).</span></span></label>
+          <label class="chk-row"><input type="checkbox" data-chk="2-b"><span><strong>Verified <code class="inline">SIGEV_PULSE_PRIO_INHERIT</code> pitfall &amp; <code class="inline">SCHED_SPORADIC</code> constraints in Lab</strong><span class="cmd">Click "Trigger SIGEV_PULSE_PRIO_INHERIT Pitfall" then restore "QNX 8.0 SCHED_SPORADIC 40/10" above</span><span class="exp">Expected: Verifier flags priority demotion FAIL, then clears all 4 QNX 8.0 kernel checks.</span></span></label>
+        </div>
+      </div>
+
+      <div class="step-foot">
+        <button type="button" class="btn" data-goto-step="1">&larr; Step 1</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn ok" data-mark-step="2">Mark Step 2 Verified</button>
+          <button type="button" class="btn primary" data-goto-step="3">Next: Step 3 (1 kHz CBF Shield) &rarr;</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- ==================== STEP 3 ==================== -->
+    <article class="step-card" id="step-3" data-step="3" data-title="1 kHz Zero-Alloc CBF Shield" data-mins="10">
+      <div class="step-top">
+        <div>
+          <div class="step-kicker">
+            <span class="step-badge">Step 03 / 06</span>
+            <span class="pill light-amber">10 min</span>
+            <span class="pill light-amber" data-step-badge="3">Not Started</span>
+          </div>
+          <h2>1 kHz Zero-Allocation Simplex Safety Shield (CBF) &amp; <code class="inline">TinyMLPPolicy</code></h2>
+          <p class="step-goal">Wrap a 1,410-parameter neural manipulation policy (<code class="inline">FP32</code> &amp; FPU-free <code class="inline">Q12</code>) behind an O(1) Supporting-Hyperplane Control Barrier Function filter achieving <strong>100/100 zero-intrusion episodes</strong> in surgical virtual fixtures.</p>
+          <div class="api-tags">
+            <span class="api-tag">SafetyShield::project() noexcept</span>
+            <span class="api-tag">medical_surgical_fixture()</span>
+            <span class="api-tag">TinyMLPPolicy (FP32 / Q12)</span>
+            <span class="api-tag">SHIELD_INTERVENTION</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>3.1 Supporting-Hyperplane CBF Math (<code class="inline">src/core/safety_shield.cpp</code>)</h3>
+      <p>
+        Every 1 ms tick, <code class="inline">SafetyShield::project(current_pos, desired_target) noexcept</code> runs purely on stack scalars (verified <strong>0 heap allocations</strong> over 100,000 iterations in <code class="inline">test_rt_noalloc</code>):
+      </p>
+      <ol class="prose">
+        <li><strong>Non-finite &amp; Kinematic Guard:</strong> Rejects <code class="inline">NaN</code>/<code class="inline">Inf</code> (<code class="inline">kShieldNonFinite</code>) and clamps displacement <code class="inline">max_step_delta</code> and acceleration <code class="inline">max_step_accel</code>.</li>
+        <li><strong>3-Pass Supporting-Hyperplane CBF:</strong> Projects <code class="inline">p</code> onto <code class="inline">(p - c) · n &ge; (1 - &alpha;) r0 + &alpha; r_eff</code> for every circular &amp; CCW convex-polygonal fixture. Tangential velocity along <code class="inline">n.perp()</code> is preserved so the end-effector slides cleanly around sterile ampoules and surgical trays without deadlocking.</li>
+        <li><strong>Continuous-Chord Invariant + Pulse Hook:</strong> Re-checks <code class="inline">segment_zone_clearance(current_pos, p) &ge; 0</code> and fires an allocation-free function pointer <code class="inline">ShieldPulseHook</code>.</li>
+      </ol>
+
+      <!-- INTERACTIVE CBF SAFETY SHIELD SANDBOX -->
+      <section class="widget" id="widget-cbf" aria-labelledby="wcbf-title">
+        <div class="widget-head">
+          <div class="widget-title" id="wcbf-title">
+            <span class="ic"><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.26,47,25.53a8,8,0,0,0,4.2,0c1-.27,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.25,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0ZM82.34,141.66a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32l-56,56a8,8,0,0,1-11.32,0Z"/></svg></span>
+            Interactive Lab · Live <code class="inline">SafetyShield::project()</code> CBF Sandbox (<code class="inline">medical_vial</code>)
+          </div>
+          <span class="pill light-ok" id="cbf-badge">SAFE · 0.0 mm Intrusion</span>
+        </div>
+
+        <div class="preset-row" role="group" aria-label="CBF fault presets">
+          <button type="button" class="btn sm" data-cbf-preset="vial">Attack Circle 0 (Fragile Vial)</button>
+          <button type="button" class="btn sm" data-cbf-preset="tray">Cross Polygon 0 (Sterile Tray)</button>
+          <button type="button" class="btn sm" data-cbf-preset="speed">Overspeed Spike</button>
+          <button type="button" class="btn sm" data-cbf-preset="nan">Inject NaN Target</button>
+          <button type="button" class="btn sm" data-cbf-preset="clear">Nominal Safe Target</button>
+        </div>
+
+        <div class="wgrid">
+          <div class="svg-box">
+            <svg id="cbf-svg" class="cbf-stage" viewBox="-220 -260 440 420" role="img" aria-label="Interactive surgical workspace showing Circle 0 vial keep-out zone, Polygon 0 sterile tray virtual fixture, desired neural target, and CBF safe projection"></svg>
+            <p style="margin:6px 0 0;font-size:12px;color:var(--ink-2)">Click or drag anywhere in the cell to steer the unshielded neural target (crimson). Watch the 1 kHz CBF shield project it tangentially (forest green) outside both virtual fixtures.</p>
+          </div>
+
+          <div>
+            <div class="field">
+              <label for="cbf-alpha"><span>CBF Relaxation Rate (&alpha;)</span><span id="cbf-alpha-val">0.55</span></label>
+              <input id="cbf-alpha" type="range" min="0.15" max="1.00" step="0.05" value="0.55">
+            </div>
+            <div class="field" style="margin-top:10px">
+              <label for="cbf-vmax"><span>Kinematic Max Step Delta (mm)</span><span id="cbf-vmax-val">85 mm</span></label>
+              <input id="cbf-vmax" type="range" min="25" max="140" step="5" value="85">
+            </div>
+            <div class="kv-grid">
+              <div class="kv"><span>Unshielded Clearance</span><b id="cbf-raw">+0.0 mm</b></div>
+              <div class="kv"><span>Projected Safe Clearance</span><b id="cbf-safe">+0.0 mm</b></div>
+              <div class="kv"><span>ShieldReasonBits Mask</span><b id="cbf-mask">0x00 (NONE)</b></div>
+              <div class="kv"><span>SHIELD_INTERVENTION Pulses</span><b id="cbf-pulses">0</b></div>
+              <div class="kv"><span>Desired Target (mm)</span><b id="cbf-des">(0, 0)</b></div>
+              <div class="kv"><span>Safe Target (mm)</span><b id="cbf-out">(0, 0)</b></div>
+            </div>
+            <div class="callout ok" style="margin-top:12px;margin-bottom:0">
+              <span class="ic"><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg></span>
+              <div id="cbf-explain">Exact JavaScript port of <code class="inline">SafetyShield::project()</code> (<code class="inline">src/core/safety_shield.cpp</code>). Circle 0: <code class="inline">(45, -185) mm, r=22 mm + 15 mm tool + 4 mm margin</code>; Polygon 0: <code class="inline">[10..70, 55..95] mm</code>.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <h3>3.2 Run the Paired S+ Neural Benchmark (<code class="inline">N = 100</code> Unseen Seeds)</h3>
+      <div class="code-wrap">
+        <div class="code-bar">
+          <div class="code-meta"><span class="code-lang">bash · benchmark</span><span>TinyMLPPolicy + medical_vial + 1 kHz CBF shield</span></div>
+          <button type="button" class="copy-btn" data-copy>Copy</button>
+        </div>
+<pre class="code">./build-host/relmw_bench --n 100 --warmup 40 --bias 0.12 \
+  --policy mlp --preset medical_vial --shield \
+  --export-replay results/host_splus/replay_showcase.bin \
+  --out results/host_splus</pre>
+      </div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Condition · Arm (N=100 paired)</th>
+              <th class="num">Task Success</th>
+              <th class="num">Zero-Intrusion</th>
+              <th class="num">Intrusions</th>
+              <th class="num">Shield Pulses</th>
+              <th class="num">Min Clearance</th>
+              <th class="num">McNemar p</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Field · <code class="inline">single_pass</code> (no shield)</td><td class="num">77/100</td><td class="num">1.0%</td><td class="num">762</td><td class="num">0</td><td class="num">-41.91 mm</td><td class="num">—</td></tr>
+            <tr><td>Field · <code class="inline">naive_retry</code> (no shield)</td><td class="num">78/100</td><td class="num">0.0%</td><td class="num" style="color:var(--bad);font-weight:700">1,345 (1.77x!)</td><td class="num">0</td><td class="num">-41.91 mm</td><td class="num">1.000</td></tr>
+            <tr class="hi"><td>Field · <code class="inline">corr_aware_retry</code> (relmw-qnx)</td><td class="num">92/100 (+15 pp)</td><td class="num" style="color:var(--ok)">100.0%</td><td class="num" style="color:var(--ok)">0</td><td class="num">7,262</td><td class="num" style="color:var(--ok)">+3.00 mm</td><td class="num">0.000275</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="checkpoint">
+        <div class="checkpoint-head">
+          <h3><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg> Verification Checkpoint 3</h3>
+          <span class="pill light-ok" data-chk-summary="3">0 / 2 checked</span>
+        </div>
+        <div class="chk-items">
+          <label class="chk-row"><input type="checkbox" data-chk="3-a"><span><strong>CBF zero-penetration &amp; Tiny-MLP FP32/Q12 unit suites PASS</strong><span class="cmd">./build-host/test_safety_shield &amp;&amp; ./build-host/test_nn_policy</span><span class="exp">Expected: 6 + 4 cases passed (2,000 random adversarial rays with 0 penetrations; Q12 parity &lt; 4 mm).</span></span></label>
+          <label class="chk-row"><input type="checkbox" data-chk="3-b"><span><strong>Reproduced 100.0% zero-intrusion &amp; 92/100 paired S+ benchmark</strong><span class="cmd">./build-host/relmw_bench --n 100 --warmup 40 --bias 0.12 --policy mlp --preset medical_vial --shield --out /tmp/splus</span><span class="exp">Expected: corr_aware_retry = 92/100, zero_intrusion_rate = 1.0, total_zone_intrusions = 0.</span></span></label>
+        </div>
+      </div>
+
+      <div class="step-foot">
+        <button type="button" class="btn" data-goto-step="2">&larr; Step 2</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn ok" data-mark-step="3">Mark Step 3 Verified</button>
+          <button type="button" class="btn primary" data-goto-step="4">Next: Step 4 (Resource Managers) &rarr;</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- ==================== STEP 4 ==================== -->
+    <article class="step-card" id="step-4" data-step="4" data-title="/dev/relmw &amp; /dev/robot0 ResMgr" data-mins="10">
+      <div class="step-top">
+        <div>
+          <div class="step-kicker">
+            <span class="step-badge">Step 04 / 06</span>
+            <span class="pill light-amber">10 min</span>
+            <span class="pill light-amber" data-step-badge="4">Not Started</span>
+          </div>
+          <h2>POSIX-Path Resource Managers (<code class="inline">/dev/relmw</code> &amp; <code class="inline">/dev/robot0</code>)</h2>
+          <p class="step-goal">Expose the supervisor as standard files via <code class="inline">resmgr_attach()</code> and isolate the robot driver behind synchronous <code class="inline">_IO_MSG</code> <code class="inline">MsgSend</code>/<code class="inline">MsgReply</code> with client priority &amp; runmask inheritance.</p>
+          <div class="api-tags">
+            <span class="api-tag">resmgr_attach</span>
+            <span class="api-tag">read64 / write64</span>
+            <span class="api-tag">resmgr_msgget</span>
+            <span class="api-tag">_IO_MSG</span>
+            <span class="api-tag">_NTO_CHF_INHERIT_RUNMASK</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>4.1 Multi-File Control Surface (<code class="inline">src/platform/qnx/qnx_resmgr.cpp</code>)</h3>
+      <div class="code-wrap">
+        <div class="code-bar">
+          <div class="code-meta"><span class="code-lang cpp">C++17 · QNX 8.0</span><span>src/platform/qnx/qnx_resmgr.cpp</span></div>
+          <button type="button" class="copy-btn" data-copy>Copy</button>
+        </div>
+<pre class="code"><span class="tok-f">iofunc_func_init</span>(_RESMGR_CONNECT_NFUNCS, &amp;connect_funcs, _RESMGR_IO_NFUNCS, &amp;io_funcs);
+io_funcs.read    = relmw_io_read;
+io_funcs.read64  = relmw_io_read;    <span class="tok-c">// QNX 8.0 routes 64-bit _IO_READ64 here</span>
+io_funcs.write   = relmw_io_write;
+io_funcs.write64 = relmw_io_write;   <span class="tok-c">// QNX 8.0 routes 64-bit _IO_WRITE64 here</span>
+
+<span class="tok-f">resmgr_attach</span>(dpp, &amp;rattr, <span class="tok-s">"/dev/relmw/status"</span>, _FTYPE_ANY, <span class="tok-n">0</span>, &amp;connect_funcs, &amp;io_funcs, &amp;attr_status);
+<span class="tok-f">resmgr_attach</span>(dpp, &amp;rattr, <span class="tok-s">"/dev/relmw/events"</span>, _FTYPE_ANY, <span class="tok-n">0</span>, &amp;connect_funcs, &amp;io_funcs, &amp;attr_events);
+<span class="tok-f">resmgr_attach</span>(dpp, &amp;rattr, <span class="tok-s">"/dev/relmw/ctl"</span>,    _FTYPE_ANY, <span class="tok-n">0</span>, &amp;connect_funcs, &amp;io_funcs, &amp;attr_ctl);
+
+<span class="tok-c">// In relmw_io_write(): reject writes claiming more bytes than the IPC message carries</span>
+<span class="tok-k">if</span> (nbytes &gt; (size_t)ctp-&gt;info.srcmsglen - (size_t)ctp-&gt;offset - <span class="tok-k">sizeof</span>(io_write_t))
+  <span class="tok-k">return</span> EBADMSG;
+<span class="tok-f">resmgr_msgget</span>(ctp, buf, n, <span class="tok-k">sizeof</span>(msg-&gt;i));</pre>
+      </div>
+
+      <h3>4.2 Process-Isolated Driver <code class="inline">/dev/robot0</code> (<code class="inline">src/platform/qnx/qnx_robot_link.cpp</code>)</h3>
+      <div class="code-wrap">
+        <div class="code-bar">
+          <div class="code-meta"><span class="code-lang cpp">C++17 · QNX 8.0</span><span>src/platform/qnx/qnx_robot_link.cpp</span></div>
+          <button type="button" class="copy-btn" data-copy>Copy</button>
+        </div>
+<pre class="code"><span class="tok-c">// Driver executes each 1 kHz step at the client's priority AND on the client's pinned CPU cluster:</span>
+<span class="tok-k">int</span> chid = <span class="tok-f">ChannelCreate</span>(_NTO_CHF_UNBLOCK | _NTO_CHF_DISCONNECT | _NTO_CHF_INHERIT_RUNMASK);
+dispatch_t* dpp = <span class="tok-f">dispatch_create_channel</span>(chid, DISPATCH_FLAG_NOLOCK);
+
+<span class="tok-k">int</span> <span class="tok-f">robot_io_msg</span>(resmgr_context_t* ctp, io_msg_t* msg, RESMGR_OCB_T* ocb) {
+  <span class="tok-k">if</span> (ctp-&gt;rcvid == <span class="tok-n">0</span>) <span class="tok-k">return</span> ENOTSUP;                  <span class="tok-c">// refuse combine messages</span>
+  <span class="tok-k">if</span> (msg-&gt;i.mgrid != kQnxRobotMgrId) <span class="tok-k">return</span> ENOSYS;    <span class="tok-c">// _IOMGR_PRIVATE_BASE + 0x52</span>
+  <span class="tok-k">if</span> (!(ocb-&gt;ioflag &amp; _IO_FLAG_WR)) <span class="tok-k">return</span> EPERM;       <span class="tok-c">// _IO_MSG bypasses iofunc_*_verify!</span>
+  <span class="tok-f">resmgr_msgget</span>(ctp, &amp;req, <span class="tok-k">sizeof</span> req, <span class="tok-n">0</span>);
+  g_ctx.server-&gt;<span class="tok-f">handle</span>(req, <span class="tok-k">sizeof</span> req, rep);
+  <span class="tok-f">MsgReply</span>(ctp-&gt;rcvid, EOK, &amp;rep, <span class="tok-k">sizeof</span> rep);
+  <span class="tok-k">return</span> _RESMGR_NOREPLY;
+}</pre>
+      </div>
+
+      <h3>4.3 Hands-On Operator Workflow (<code class="inline">RELMW_QNX_SIM=1</code> &amp; Native QNX 8.0)</h3>
+      <div class="code-wrap">
+        <div class="code-bar">
+          <div class="code-meta"><span class="code-lang">bash · QNX API simulation</span><span>Rehearse the real #ifdef __QNX__ resmgr path locally</span></div>
+          <button type="button" class="copy-btn" data-copy>Copy</button>
+        </div>
+<pre class="code">export RELMW_QNX_SIM=1 QNXSIM_IO="$PWD/build-sim/qnxsim_io" QNXSIM_ROOT=/tmp/qnxsim-lab
+rm -rf "$QNXSIM_ROOT" &amp;&amp; mkdir -p "$QNXSIM_ROOT"
+
+./build-sim/relmw_robotd --path /dev/robot0 &amp;
+ROBOTD_PID=$! ; sleep 0.5
+./build-sim/relmw_supervisor --episodes 0 --period-us 1000 --sched other \
+  --preset medical_vial --policy mlp --shield \
+  --robot /dev/robot0 --mount /dev/relmw --library /tmp/qnxsim-lib.txt &amp;
+sleep 1
+
+scripts/relmwctl status
+scripts/relmwctl fault percep_bias
+scripts/relmwctl plan push_B,push_A
+scripts/relmwctl events 10
+scripts/relmwctl quit
+kill "$ROBOTD_PID" 2&gt;/dev/null || true</pre>
+      </div>
+
+      <div class="checkpoint">
+        <div class="checkpoint-head">
+          <h3><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg> Verification Checkpoint 4</h3>
+          <span class="pill light-ok" data-chk-summary="4">0 / 2 checked</span>
+        </div>
+        <div class="chk-items">
+          <label class="chk-row"><input type="checkbox" data-chk="4-a"><span><strong>Operator control surface &amp; library persistence E2E PASS</strong><span class="cmd">sh tests/test_supervisor_e2e.sh ./build-host/relmw_supervisor ./scripts/relmwctl</span><span class="exp">Expected: status, fault, plan, and restart library retention all pass.</span></span></label>
+          <label class="chk-row"><input type="checkbox" data-chk="4-b"><span><strong>Simulated QNX <code class="inline">resmgr_attach</code> + 3x <code class="inline">relmw_robotd</code> SIGKILL E2E PASS</strong><span class="cmd">sh tests/qnx_sim/test_sim_e2e.sh ./build-sim .</span><span class="exp">Expected: OK — remote == in-process counters and byte-identical failure library across 3 driver kills.</span></span></label>
+        </div>
+      </div>
+
+      <div class="step-foot">
+        <button type="button" class="btn" data-goto-step="3">&larr; Step 3</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn ok" data-mark-step="4">Mark Step 4 Verified</button>
+          <button type="button" class="btn primary" data-goto-step="5">Next: Step 5 (HAM &amp; slog2) &rarr;</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- ==================== STEP 5 ==================== -->
+    <article class="step-card" id="step-5" data-step="5" data-title="HAM, slog2 &amp; ROS 2 Bridge" data-mins="10">
+      <div class="step-top">
+        <div>
+          <div class="step-kicker">
+            <span class="step-badge">Step 05 / 06</span>
+            <span class="pill light-amber">10 min</span>
+            <span class="pill light-amber" data-step-badge="5">Not Started</span>
+          </div>
+          <h2>Dual-Layer <code class="inline">HAM</code> Self-Healing, <code class="inline">slog2</code> &amp; 128-B ROS 2 Telemetry</h2>
+          <p class="step-goal">Pair HAM process resurrection and hang-to-death heartbeats with lock-light <code class="inline">slog2</code> shared-memory logging and zero-copy 128-byte IEEE CRC-32 telemetry frames.</p>
+          <div class="api-tags">
+            <span class="api-tag">ham_attach / CONDDEATH</span>
+            <span class="api-tag">ham_attach_self</span>
+            <span class="api-tag">slog2_register / vslog2f</span>
+            <span class="api-tag">TelemetryFrame (128 B)</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>5.1 Dual-Layer HAM Self-Healing (<code class="inline">apps/relmw_ham_setup.cpp</code> + <code class="inline">qnx_timer.cpp</code>)</h3>
+      <p>
+        In QNX OS 8.0, a heartbeat alone triggers nothing — HAM only reacts to registered <em>conditions</em>. We attach two complementary entities so both hard crashes and silent infinite loops self-heal cleanly:
+      </p>
+      <div class="code-wrap">
+        <div class="code-bar">
+          <div class="code-meta"><span class="code-lang cpp">C++17 · libham</span><span>apps/relmw_ham_setup.cpp + qnx_timer.cpp</span></div>
+          <button type="button" class="copy-btn" data-copy>Copy</button>
+        </div>
+<pre class="code"><span class="tok-c">// Layer 1 (apps/relmw_ham_setup.cpp): respawn supervisor &amp; robotd on process death</span>
+<span class="tok-f">ham_connect</span>(<span class="tok-n">0</span>);
+ham_entity_t* e    = <span class="tok-f">ham_attach</span>(name, <span class="tok-n">0</span>, -<span class="tok-n">1</span>, line, <span class="tok-n">0</span>);
+ham_condition_t* c = <span class="tok-f">ham_condition</span>(e, CONDDEATH, <span class="tok-s">"death"</span>, HREARMAFTERRESTART);
+<span class="tok-f">ham_action_restart</span>(c, <span class="tok-s">"restart"</span>, line, HREARMAFTERRESTART);
+
+<span class="tok-c">// Layer 2 (qnx_timer.cpp watchdog_attach): turn a silent hang into a death Layer 1 restarts</span>
+ham_entity_t* hb   = <span class="tok-f">ham_attach_self</span>(<span class="tok-s">"relmw_supervisor_hb"</span>, heartbeat_ns, <span class="tok-n">3</span>, <span class="tok-n">10</span>, <span class="tok-n">0</span>);
+ham_condition_t* lo = <span class="tok-f">ham_condition</span>(hb, CONDHBEATMISSEDLOW,  <span class="tok-s">"hb_missed_low"</span>,  <span class="tok-n">0</span>);
+ham_condition_t* hi = <span class="tok-f">ham_condition</span>(hb, CONDHBEATMISSEDHIGH, <span class="tok-s">"hb_missed_high"</span>, <span class="tok-n">0</span>);
+<span class="tok-f">ham_action_execute</span>(hi, <span class="tok-s">"kill_hung"</span>, <span class="tok-s">"/system/bin/slay -f -9 -m pid &lt;pid&gt;"</span>, <span class="tok-n">0</span>);</pre>
+      </div>
+
+      <h3>5.2 Structured Logging with <code class="inline">slog2</code> (<code class="inline">src/platform/qnx/qnx_log.cpp</code>)</h3>
+      <p>
+        QNX OS 8.0 removed <code class="inline">syslogd</code>. <code class="inline">log_init("relmw")</code> allocates an 8-page (32 KB) shared-memory ring buffer in <code class="inline">slogger2</code> and streams structured severity logs via <code class="inline">vslog2f()</code>. Inspect live logs on target with <code class="inline">slog2info -b relmw</code> (or <code class="inline">build-sim/qnxsim_slog2info -b relmw</code> locally).
+      </p>
+
+      <h3>5.3 128-Byte Zero-Copy Binary Telemetry &amp; ROS 2 Bridge</h3>
+      <div class="code-wrap">
+        <div class="code-bar">
+          <div class="code-meta"><span class="code-lang">bash · telemetry + ROS 2</span><span>Decode 642-frame CRC-32 replay stream</span></div>
+          <button type="button" class="copy-btn" data-copy>Copy</button>
+        </div>
+<pre class="code"><span class="tok-c"># Inspect verified 128-byte IEEE CRC-32 TelemetryFrame records (82,176 B total)</span>
+python3 tools/ros2_qnx_bridge.py decode results/host_splus/replay_showcase.bin | head -n 5
+
+<span class="tok-c"># Run UDP bridge (auto-publishes /relmw/diagnostics &amp; /relmw/pose with rclpy, or JSONL offline)</span>
+python3 tools/test_ros2_bridge.py</pre>
+      </div>
+
+      <div class="checkpoint">
+        <div class="checkpoint-head">
+          <h3><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg> Verification Checkpoint 5</h3>
+          <span class="pill light-ok" data-chk-summary="5">0 / 2 checked</span>
+        </div>
+        <div class="chk-items">
+          <label class="chk-row"><input type="checkbox" data-chk="5-a"><span><strong>128-byte CRC-32 telemetry &amp; ROS 2 bridge tests PASS</strong><span class="cmd">./build-host/test_telemetry_bridge &amp;&amp; python3 tools/test_ros2_bridge.py</span><span class="exp">Expected: 3 C++ cases + 3 Python tests OK (single-bit CRC flip rejected, UDP loopback verified).</span></span></label>
+          <label class="chk-row"><input type="checkbox" data-chk="5-b"><span><strong>Isolated <code class="inline">relmw_robotd</code> 3x crash-recovery E2E PASS</strong><span class="cmd">sh tests/test_robotd_e2e.sh ./build-host/relmw_robotd ./build-host/relmw_supervisor</span><span class="exp">Expected: zero lost episodes and identical failure library after 3 driver kills.</span></span></label>
+        </div>
+      </div>
+
+      <div class="step-foot">
+        <button type="button" class="btn" data-goto-step="4">&larr; Step 4</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn ok" data-mark-step="5">Mark Step 5 Verified</button>
+          <button type="button" class="btn primary" data-goto-step="6">Next: Step 6 (secpol &amp; Deploy) &rarr;</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- ==================== STEP 6 ==================== -->
+    <article class="step-card" id="step-6" data-step="6" data-title="secpol Hardening &amp; QNX 8.0 Deploy" data-mins="10">
+      <div class="step-top">
+        <div>
+          <div class="step-kicker">
+            <span class="step-badge">Step 06 / 06</span>
+            <span class="pill light-amber">10 min</span>
+            <span class="pill light-amber" data-step-badge="6">Not Started</span>
+          </div>
+          <h2>Least-Privilege <code class="inline">secpol</code> Hardening &amp; One-Click QNX SDP 8.0 Deployment</h2>
+          <p class="step-goal">Lock down every path attachment and IPC channel with QNX 8.0 Mandatory Access Control, lint the policy statically, and package the complete QEMU x86_64 / Raspberry Pi 5 evidence bundle.</p>
+          <div class="api-tags">
+            <span class="api-tag">secpolcompile</span>
+            <span class="api-tag">allow_attach</span>
+            <span class="api-tag">PROCMGR_AID_PATHSPACE</span>
+            <span class="api-tag">run_qnx80_evidence_pack.sh</span>
+            <span class="api-tag">tracelogger</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- INTERACTIVE SECPOL CHECKER -->
+      <section class="widget" id="widget-secpol" aria-labelledby="wsp-title">
+        <div class="widget-head">
+          <div class="widget-title" id="wsp-title">
+            <span class="ic"><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M40,88H73a32,32,0,0,0,62,0h81a8,8,0,0,0,0-16H135a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16Zm64-24A16,16,0,1,1,88,80,16,16,0,0,1,104,64ZM216,168H199a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16h97a32,32,0,0,0,62,0h17a8,8,0,0,0,0-16Zm-48,24a16,16,0,1,1,16-16A16,16,0,0,1,168,192Z"/></svg></span>
+            Interactive Lab · QNX 8.0 <code class="inline">secpol</code> Least-Privilege Access Verifier
+          </div>
+          <span class="pill light-ok" id="sp-badge">ALLOW</span>
+        </div>
+        <div class="wgrid">
+          <div class="field">
+            <label for="sp-caller">Calling Process Type</label>
+            <select id="sp-caller">
+              <option value="relmw_supervisor_t">relmw_supervisor_t (uid 1001)</option>
+              <option value="relmw_robotd_t">relmw_robotd_t (uid 1001)</option>
+              <option value="relmw_operator_t">relmw_operator_t (uid 1002)</option>
+              <option value="untyped_shell_t">untyped_shell_t (untrusted shell)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="sp-op">Requested Kernel Operation</label>
+            <select id="sp-op">
+              <option value="attach_relmw">resmgr_attach("/dev/relmw/ctl")</option>
+              <option value="attach_robot0">resmgr_attach("/dev/robot0")</option>
+              <option value="attach_robot1">resmgr_attach("/dev/robot1") [rogue path]</option>
+              <option value="conn_robotd">ConnectAttach / open("/dev/robot0")</option>
+              <option value="conn_sup">open("/dev/relmw/ctl")</option>
+              <option value="conn_slog2">ConnectAttach(slogger2_t)</option>
+              <option value="conn_ham">ConnectAttach(ham_t)</option>
+              <option value="prio_70">pthread_setschedparam(SCHED_FIFO, prio=70)</option>
+            </select>
+          </div>
+        </div>
+        <div class="rule-list" id="sp-result"></div>
+      </section>
+
+      <h3>6.1 Lint <code class="inline">relmw_secpol.txt</code> &amp; Run One-Click QNX SDP 8.0 Evidence Packager</h3>
+      <div class="code-wrap">
+        <div class="code-bar">
+          <div class="code-meta"><span class="code-lang">bash · host audit</span><span>Verify secpol + full 39-test offline release gate</span></div>
+          <button type="button" class="copy-btn" data-copy>Copy</button>
+        </div>
+<pre class="code"><span class="tok-c"># 1. Static QNX 8.0 secpol audit (21 assertions)</span>
+python3 tools/secpol_lint.py config/secpol/relmw_secpol.txt --repo .
+python3 tools/test_secpol_lint.py
+
+<span class="tok-c"># 2. Complete offline verification (39/39 tests + S+ benchmark + dashboard rebuild)</span>
+CXX=clang++ bash scripts/run_qnx80_evidence_pack.sh --host-verify</pre>
+      </div>
+
+      <div class="code-wrap">
+        <div class="code-bar">
+          <div class="code-meta"><span class="code-lang target">bash · QNX SDP 8.0 target</span><span>One-click qcc/q++ cross-build, 4-vCPU QEMU boot, tracelogger &amp; HAM proof</span></div>
+          <button type="button" class="copy-btn" data-copy>Copy</button>
+        </div>
+<pre class="code"><span class="tok-c"># On a Linux/KVM host with free QNX Everywhere SDP 8.0 installed at ~/qnx800:</span>
+QNX_SDP=~/qnx800 bash scripts/run_qnx80_evidence_pack.sh --preflight
+QNX_SDP=~/qnx800 bash scripts/run_qnx80_evidence_pack.sh --keep-vm
+
+<span class="tok-c"># Raspberry Pi 5 (aarch64le) cross-build:</span>
+source ~/qnx800/qnxsdp-env.sh
+cmake -S . -B build-qnx-aarch64le -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/qnx-aarch64le.cmake -DCMAKE_CXX_FLAGS="-Wall -Wextra -Werror"
+cmake --build build-qnx-aarch64le --parallel</pre>
+      </div>
+
+      <div class="checkpoint">
+        <div class="checkpoint-head">
+          <h3><svg class="ph" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg> Verification Checkpoint 6 (Final Sign-Off)</h3>
+          <span class="pill light-ok" data-chk-summary="6">0 / 2 checked</span>
+        </div>
+        <div class="chk-items">
+          <label class="chk-row"><input type="checkbox" data-chk="6-a"><span><strong>QNX 8.0 <code class="inline">secpol</code> linter passes 21/21 least-privilege checks</strong><span class="cmd">python3 tools/test_secpol_lint.py</span><span class="exp">Expected: Ran 21 tests ... OK (zero excess abilities, valid pathspace &amp; channel rules).</span></span></label>
+          <label class="chk-row"><input type="checkbox" data-chk="6-b"><span><strong>Full 39/39 test gate + S+ benchmark + offline dashboard PASS</strong><span class="cmd">CXX=clang++ bash scripts/run_qnx80_evidence_pack.sh --host-verify</span><span class="exp">Expected: 22 Host + 17 QNX_SIM tests PASS, 0 warnings, docs/dashboard.html regenerated.</span></span></label>
+        </div>
+      </div>
+
+      <div class="step-foot">
+        <button type="button" class="btn" data-goto-step="5">&larr; Step 5</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn ok" data-mark-step="6">Mark Step 6 Verified</button>
+          <a class="btn primary" href="../dashboard.html">Explore Replay Dashboard &rarr;</a>
+        </div>
+      </div>
+    </article>
+  </main>
+</div>
+
+<footer class="page-foot">
+  <div><strong>relmw-qnx</strong> · 6-Step QNX OS 8.0 Simplex Safety Supervisor Codelab · Zero external CDN · Industrial warm-amber/graphite instrument UI</div>
+  <div>
+    <a href="CODELAB.md">CODELAB.md</a> ·
+    <a href="../dashboard.html">dashboard.html</a> ·
+    <a href="../architecture.svg">architecture.svg</a> ·
+    <a href="https://github.com/Qidianyan/relmw-qnx" target="_blank" rel="noopener">GitHub Repo</a> ·
+    <a href="https://youtu.be/kLAHQDBODiU" target="_blank" rel="noopener">Demo Video</a>
+  </div>
+</footer>
+
+<div class="live-toast" id="live-toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORE_KEY = "relmw_qnx_codelab_v1";
+  var steps = Array.prototype.slice.call(document.querySelectorAll("article.step-card"));
+  var state = { active: 1, mode: "single", checks: {} };
+
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          if (parsed.active >= 1 && parsed.active <= steps.length) state.active = parsed.active;
+          if (parsed.mode === "all" || parsed.mode === "single") state.mode = parsed.mode;
+          if (parsed.checks && typeof parsed.checks === "object") state.checks = parsed.checks;
+        }
+      }
+    } catch (_e) {}
+    var m = /^#step-([1-6])$/.exec(window.location.hash || "");
+    if (m) state.active = parseInt(m[1], 10);
+  }
+
+  function saveState() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (_e) {}
+  }
+
+  var toastTimer = null;
+  function showToast(msg) {
+    var el = document.getElementById("live-toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ el.classList.remove("show"); }, 2200);
+  }
+
+  function stepCheckIds(n) {
+    return Array.prototype.slice.call(
+      document.querySelectorAll('article[data-step="' + n + '"] input[data-chk]')
+    ).map(function(el){ return el.getAttribute("data-chk"); });
+  }
+
+  function stepProgress(n) {
+    var ids = stepCheckIds(n);
+    var done = ids.filter(function(id){ return !!state.checks[id]; }).length;
+    return { done: done, total: ids.length, complete: ids.length > 0 && done === ids.length };
+  }
+
+  function renderNavAndProgress() {
+    var sideList = document.getElementById("side-step-list");
+    var mobBar = document.getElementById("mob-stepper");
+    sideList.innerHTML = "";
+    mobBar.innerHTML = "";
+
+    var verifiedSteps = 0;
+    var remainingMins = 0;
+
+    steps.forEach(function(art){
+      var n = parseInt(art.getAttribute("data-step"), 10);
+      var title = art.getAttribute("data-title");
+      var mins = parseInt(art.getAttribute("data-mins"), 10) || 10;
+      var prog = stepProgress(n);
+      if (prog.complete) verifiedSteps += 1;
+      else remainingMins += mins;
+
+      art.classList.toggle("active", n === state.active);
+
+      var badge = document.querySelector('[data-step-badge="' + n + '"]');
+      if (badge) {
+        badge.className = "pill " + (prog.complete ? "light-ok" : (prog.done > 0 || n === state.active ? "light-amber" : "light-accent"));
+        badge.textContent = prog.complete ? "Verified" : (prog.done > 0 ? "In Progress" : (n === state.active ? "Active" : "Pending"));
+      }
+      var sumEl = document.querySelector('[data-chk-summary="' + n + '"]');
+      if (sumEl) sumEl.textContent = prog.done + " / " + prog.total + " checked";
+
+      var li = document.createElement("li");
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "step-nav-btn" + (n === state.active ? " active" : "") + (prog.complete ? " done" : "");
+      btn.setAttribute("aria-current", n === state.active ? "step" : "false");
+      btn.innerHTML = '<span class="num">' + (prog.complete ? "&#10003;" : ("0" + n)) + '</span>'
+        + '<span><span class="stitle">' + title + '</span><span class="smeta">' + mins + ' min</span></span>'
+        + '<span class="chk-frac">' + prog.done + '/' + prog.total + '</span>';
+      btn.addEventListener("click", function(){ goToStep(n, true); });
+      li.appendChild(btn);
+      sideList.appendChild(li);
+
+      var mbtn = document.createElement("button");
+      mbtn.type = "button";
+      mbtn.className = "mob-step-btn" + (n === state.active ? " active" : "") + (prog.complete ? " done" : "");
+      mbtn.textContent = (prog.complete ? "OK " : "") + "0" + n + " · " + title.split(" ")[0];
+      mbtn.addEventListener("click", function(){ goToStep(n, true); });
+      mobBar.appendChild(mbtn);
+    });
+
+    var pct = Math.round((verifiedSteps / steps.length) * 100);
+    document.getElementById("top-prog-pill").textContent = verifiedSteps + " / " + steps.length + " Verified";
+    document.getElementById("top-pbar").style.width = pct + "%";
+    document.getElementById("side-pbar").style.width = pct + "%";
+    document.getElementById("side-pct").textContent = pct + "% complete";
+    document.getElementById("side-remaining").textContent = remainingMins === 0 ? "Complete!" : (remainingMins + " min left");
+    document.getElementById("complete-banner").classList.toggle("show", verifiedSteps === steps.length);
+
+    document.body.classList.toggle("mode-single", state.mode === "single");
+    var modeBtn = document.getElementById("btn-mode-toggle");
+    modeBtn.setAttribute("aria-pressed", state.mode === "all" ? "true" : "false");
+    modeBtn.textContent = state.mode === "all" ? "Step-by-Step" : "All 6 Steps";
+  }
+
+  function syncCheckboxesFromState() {
+    var boxes = document.querySelectorAll("input[data-chk]");
+    for (var i = 0; i < boxes.length; i++) {
+      var id = boxes[i].getAttribute("data-chk");
+      var on = !!state.checks[id];
+      boxes[i].checked = on;
+      var row = boxes[i].closest(".chk-row");
+      if (row) row.classList.toggle("checked", on);
+    }
+  }
+
+  function goToStep(n, scroll) {
+    state.active = Math.max(1, Math.min(steps.length, n));
+    saveState();
+    renderNavAndProgress();
+    try { history.replaceState(null, "", "#step-" + state.active); } catch (_e) {}
+    if (scroll) {
+      var target = document.getElementById("step-" + state.active);
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  // Bind checkboxes, step navigation & mode buttons
+  document.querySelectorAll("input[data-chk]").forEach(function(box){
+    box.addEventListener("change", function(){
+      var id = box.getAttribute("data-chk");
+      state.checks[id] = box.checked;
+      var row = box.closest(".chk-row");
+      if (row) row.classList.toggle("checked", box.checked);
+      saveState();
+      renderNavAndProgress();
+      showToast(box.checked ? "Checkpoint verified" : "Checkpoint unchecked");
+    });
+  });
+
+  document.querySelectorAll("[data-goto-step]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      goToStep(parseInt(btn.getAttribute("data-goto-step"), 10), true);
+    });
+  });
+
+  document.querySelectorAll("[data-mark-step]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var n = parseInt(btn.getAttribute("data-mark-step"), 10);
+      stepCheckIds(n).forEach(function(id){ state.checks[id] = true; });
+      syncCheckboxesFromState();
+      saveState();
+      renderNavAndProgress();
+      showToast("Step 0" + n + " marked verified");
+      if (n < steps.length) goToStep(n + 1, true);
+    });
+  });
+
+  document.querySelectorAll("[data-jump-step]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var n = parseInt(btn.getAttribute("data-jump-step"), 10);
+      var tid = btn.getAttribute("data-jump-id");
+      goToStep(n, false);
+      var el = document.getElementById(tid);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+
+  document.getElementById("btn-mode-toggle").addEventListener("click", function(){
+    state.mode = state.mode === "single" ? "all" : "single";
+    saveState();
+    renderNavAndProgress();
+    showToast(state.mode === "all" ? "Showing all 6 steps" : "Focused step-by-step view");
+  });
+
+  document.getElementById("btn-print").addEventListener("click", function(){ window.print(); });
+
+  document.getElementById("btn-reset-progress").addEventListener("click", function(){
+    state.checks = {};
+    syncCheckboxesFromState();
+    saveState();
+    renderNavAndProgress();
+    showToast("Progress reset");
+  });
+
+  // Copy-code buttons with clipboard fallback (synchronous fallback when not in secure context, e.g. file://)
+  function copyText(text, btn) {
+    if (!btn.dataset.origLabel) btn.dataset.origLabel = btn.textContent;
+    function done() {
+      btn.classList.add("copied");
+      btn.textContent = "Copied";
+      showToast("Copied command/code to clipboard");
+      clearTimeout(btn._copyTimer);
+      btn._copyTimer = setTimeout(function(){
+        btn.classList.remove("copied");
+        btn.textContent = btn.dataset.origLabel;
+      }, 1600);
+    }
+    if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function(){ fallbackCopy(text, done); });
+    } else {
+      fallbackCopy(text, done);
+    }
+  }
+  function fallbackCopy(text, cb) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); } catch (_e) {}
+    document.body.removeChild(ta);
+    cb();
+  }
+  document.querySelectorAll("[data-copy]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var pre = btn.closest(".code-wrap").querySelector("pre.code");
+      if (pre) copyText(pre.textContent.trim(), btn);
+    });
+  });
+
+  // ==================== INTERACTIVE LAB 1: TIMING & JITTER VERIFIER ====================
+  var tvIds = ["tv-period","tv-sched","tv-cluster","tv-prio","tv-low","tv-budget","tv-pulse","tv-p50","tv-p99","tv-max","tv-comp","tv-dl"];
+  function numVal(id, def) {
+    var v = parseFloat(document.getElementById(id).value);
+    return isFinite(v) ? v : def;
+  }
+  function updateTimingVerifier() {
+    var T = Math.max(200, numVal("tv-period", 1000));
+    var sched = document.getElementById("tv-sched").value;
+    var cluster = document.getElementById("tv-cluster").value;
+    var prio = Math.round(numVal("tv-prio", 40));
+    var low = Math.round(numVal("tv-low", 10));
+    var budget = numVal("tv-budget", 500);
+    var pulseMode = document.getElementById("tv-pulse").value;
+    var p50 = Math.max(0.5, numVal("tv-p50", 60.4));
+    var p99 = Math.max(p50, numVal("tv-p99", 262.1));
+    var mx = Math.max(p99, numVal("tv-max", 3138.5));
+    var comp = Math.max(0.5, numVal("tv-comp", 38.9));
+    var dlPct = Math.max(10, Math.min(100, numVal("tv-dl", 50)));
+    var deadline = T * (dlPct / 100.0);
+    var slack = deadline - (p99 + comp);
+
+    var rules = [];
+    var hasFail = false;
+    var hasWarn = false;
+
+    if (pulseMode === "inherit" && sched !== "other") {
+      hasFail = true;
+      rules.push({ lv: "fail", tag: "FAIL", text: "SIGEV_PULSE_PRIO_INHERIT pitfall! Receiver drops from priority " + prio + " to process initial priority (10) on every 1 kHz tick. Pass explicit pthread_getschedparam() priority instead." });
+    } else {
+      rules.push({ lv: "pass", tag: "PASS", text: "Explicit pulse priority (" + prio + ") registered via MsgRegisterEvent(..., SYSMGR_COID): zero silent priority demotion." });
+    }
+
+    if (sched === "sporadic") {
+      if (low >= prio || budget <= 0 || budget >= T) {
+        hasFail = true;
+        rules.push({ lv: "fail", tag: "FAIL", text: "QNX 8.0 SCHED_SPORADIC invariant violated: requires low_priority (" + low + ") < priority (" + prio + ") and 0 < budget (" + budget + " us) < period (" + T + " us)." });
+      } else {
+        var util = ((budget / T) * 100).toFixed(1);
+        rules.push({ lv: "pass", tag: "PASS", text: "SCHED_SPORADIC invariants valid: high=" + prio + " > low=" + low + ", budget=" + budget + " us / " + T + " us (" + util + "% max RT CPU cap, protects HAM)." });
+      }
+    } else if (sched === "other") {
+      hasWarn = true;
+      rules.push({ lv: "warn", tag: "WARN", text: "SCHED_OTHER is time-shared baseline only (no real-time preemption guarantee under busy-loop load)." });
+    } else {
+      rules.push({ lv: "pass", tag: "PASS", text: "Real-time scheduling policy " + sched.toUpperCase() + " at priority " + prio + " on cluster " + cluster + "." });
+    }
+
+    if (prio > 63) {
+      hasWarn = true;
+      rules.push({ lv: "warn", tag: "SECPOL", text: "Priority " + prio + " exceeds QNX 8.0 unprivileged ceiling (63): requires explicit PROCMGR_AID_PRIORITY / ability priority:64-" + prio + " in relmw_secpol.txt." });
+    } else {
+      rules.push({ lv: "pass", tag: "SECPOL", text: "Priority " + prio + " <= 63: runs non-root (uid 1001) with zero PROCMGR_AID_PRIORITY privilege needed." });
+    }
+
+    if (slack < 0) {
+      hasFail = true;
+      rules.push({ lv: "fail", tag: "MISS", text: "p99 release (" + p99.toFixed(1) + " us) + compute (" + comp.toFixed(1) + " us) exceeds " + deadline.toFixed(0) + " us deadline by " + Math.abs(slack).toFixed(1) + " us." });
+    } else if (mx > deadline) {
+      hasWarn = true;
+      rules.push({ lv: "warn", tag: "TAIL", text: "p99 + compute fits with +" + slack.toFixed(1) + " us slack, but max spike (" + mx.toFixed(1) + " us) exceeds " + deadline.toFixed(0) + " us deadline (typical of non-RT host SCHED_OTHER)." });
+    } else {
+      rules.push({ lv: "pass", tag: "PASS", text: "All quantiles (including max " + mx.toFixed(1) + " us) stay strictly inside " + deadline.toFixed(0) + " us deadline (p99 slack +" + slack.toFixed(1) + " us)." });
+    }
+
+    var badge = document.getElementById("tv-verdict");
+    if (hasFail) { badge.className = "pill light-bad"; badge.textContent = "FAIL · CONSTRAINT / DEADLINE"; }
+    else if (hasWarn) { badge.className = "pill light-amber"; badge.textContent = "WARN · TAIL / PRIVILEGE"; }
+    else { badge.className = "pill light-ok"; badge.textContent = "PASS · DETERMINISTIC"; }
+
+    var rlist = document.getElementById("tv-rules");
+    rlist.innerHTML = rules.map(function(r){
+      return '<div class="rule-item ' + r.lv + '"><span class="rtag">' + r.tag + '</span><span>' + r.text + '</span></div>';
+    }).join("");
+
+    // Render SVG log-scale latency chart (10 us .. 100000 us)
+    var x0 = 76, x1 = 456, span = x1 - x0;
+    function lx(us) {
+      var clamped = Math.max(10, Math.min(100000, us));
+      return x0 + ((Math.log(clamped) / Math.LN10 - 1) / 4) * span;
+    }
+    var ticks = [10, 100, 1000, 10000, 100000];
+    var rows = [
+      { label: "compute p99", val: comp, col: "#2F7D4F" },
+      { label: "release p50", val: p50, col: "#7D776C" },
+      { label: "release p99", val: p99, col: p99 > deadline ? "#B42318" : "#C2410C" },
+      { label: "release max", val: mx,  col: mx > deadline ? "#B42318" : "#D97706" }
+    ];
+    var dlX = lx(deadline);
+    var out = '<rect x="0" y="0" width="480" height="185" rx="6" fill="#FBFAF7"/>';
+    ticks.forEach(function(tk){
+      var gx = lx(tk).toFixed(1);
+      out += '<line x1="' + gx + '" y1="22" x2="' + gx + '" y2="152" stroke="#E3E0D8"/>';
+      out += '<text x="' + gx + '" y="170" font-size="10" text-anchor="middle" fill="#524E46" font-family="ui-monospace,monospace">' + (tk >= 1000 ? (tk / 1000) + ' ms' : tk + ' us') + '</text>';
+    });
+    rows.forEach(function(row, idx){
+      var y = 34 + idx * 29;
+      var w = Math.max(3, lx(row.val) - x0);
+      out += '<text x="70" y="' + (y + 11) + '" font-size="10.5" text-anchor="end" fill="#524E46" font-family="ui-monospace,monospace">' + row.label + '</text>';
+      out += '<rect x="' + x0 + '" y="' + y + '" width="' + w.toFixed(1) + '" height="14" rx="3" fill="' + row.col + '"/>';
+      var lblX = Math.min(448, x0 + w + 5);
+      var anchor = (x0 + w > 395) ? "end" : "start";
+      var fillTxt = (x0 + w > 395) ? "#FFFFFF" : "#1C1917";
+      if (anchor === "end") lblX = x0 + w - 5;
+      out += '<text x="' + lblX.toFixed(1) + '" y="' + (y + 11) + '" font-size="10.5" font-weight="600" text-anchor="' + anchor + '" fill="' + fillTxt + '" font-family="ui-monospace,monospace">' + row.val.toFixed(1) + ' us</text>';
+    });
+    out += '<line x1="' + dlX.toFixed(1) + '" y1="18" x2="' + dlX.toFixed(1) + '" y2="154" stroke="#B42318" stroke-width="1.6" stroke-dasharray="4 3"/>';
+    out += '<text x="' + Math.min(472, dlX + 4).toFixed(1) + '" y="16" font-size="10" font-weight="700" fill="#B42318" font-family="ui-monospace,monospace">deadline ' + deadline.toFixed(0) + ' us</text>';
+    document.getElementById("tv-svg").innerHTML = out;
+
+    var cmd = "/data/relmw/bin/relmw_supervisor --episodes 30 --period-us " + Math.round(T)
+      + " --sched " + sched + " --prio " + prio
+      + (cluster !== "_all" ? " --cluster " + cluster : "")
+      + " --policy mlp --preset medical_vial --shield --ham"
+      + " --mount /dev/relmw --report /data/relmw/out/rt_report.json";
+    document.getElementById("tv-cmd").textContent = cmd;
+  }
+
+  tvIds.forEach(function(id){
+    document.getElementById(id).addEventListener("input", updateTimingVerifier);
+    document.getElementById(id).addEventListener("change", updateTimingVerifier);
+  });
+
+  document.querySelectorAll("[data-tv-preset]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var p = btn.getAttribute("data-tv-preset");
+      if (p === "host_idle") {
+        document.getElementById("tv-period").value = 1000;
+        document.getElementById("tv-sched").value = "other";
+        document.getElementById("tv-cluster").value = "_all";
+        document.getElementById("tv-prio").value = 40;
+        document.getElementById("tv-pulse").value = "explicit";
+        document.getElementById("tv-p50").value = 60.4;
+        document.getElementById("tv-p99").value = 262.1;
+        document.getElementById("tv-max").value = 3138.5;
+        document.getElementById("tv-comp").value = 38.9;
+      } else if (p === "host_load") {
+        document.getElementById("tv-period").value = 1000;
+        document.getElementById("tv-sched").value = "other";
+        document.getElementById("tv-cluster").value = "_all";
+        document.getElementById("tv-prio").value = 40;
+        document.getElementById("tv-pulse").value = "explicit";
+        document.getElementById("tv-p50").value = 54.3;
+        document.getElementById("tv-p99").value = 1081.3;
+        document.getElementById("tv-max").value = 19263.4;
+        document.getElementById("tv-comp").value = 41.0;
+      } else if (p === "qnx_budget") {
+        document.getElementById("tv-period").value = 1000;
+        document.getElementById("tv-sched").value = "sporadic";
+        document.getElementById("tv-cluster").value = "_cpu-1";
+        document.getElementById("tv-prio").value = 40;
+        document.getElementById("tv-low").value = 10;
+        document.getElementById("tv-budget").value = 500;
+        document.getElementById("tv-pulse").value = "explicit";
+        document.getElementById("tv-p50").value = 25.0;
+        document.getElementById("tv-p99").value = 95.0;
+        document.getElementById("tv-max").value = 210.0;
+        document.getElementById("tv-comp").value = 18.0;
+      } else if (p === "pitfall") {
+        document.getElementById("tv-sched").value = "fifo";
+        document.getElementById("tv-prio").value = 40;
+        document.getElementById("tv-pulse").value = "inherit";
+      }
+      updateTimingVerifier();
+      showToast("Loaded timing configuration: " + p);
+    });
+  });
+
+  document.getElementById("tv-parse-btn").addEventListener("click", function(){
+    var txt = document.getElementById("tv-json").value.trim();
+    var msg = document.getElementById("tv-json-msg");
+    if (!txt) { msg.textContent = "Paste JSON from rt_report_*.json first."; return; }
+    try {
+      var obj = JSON.parse(txt);
+      if (obj.period_ns) document.getElementById("tv-period").value = Math.round(obj.period_ns / 1000);
+      if (obj.sched && ["fifo","sporadic","rr","other"].indexOf(obj.sched) >= 0) document.getElementById("tv-sched").value = obj.sched;
+      if (obj.priority) document.getElementById("tv-prio").value = obj.priority;
+      if (obj.release_latency) {
+        if (obj.release_latency.p50_ns != null) document.getElementById("tv-p50").value = (obj.release_latency.p50_ns / 1000).toFixed(1);
+        if (obj.release_latency.p99_ns != null) document.getElementById("tv-p99").value = (obj.release_latency.p99_ns / 1000).toFixed(1);
+        if (obj.release_latency.max_ns != null) document.getElementById("tv-max").value = (obj.release_latency.max_ns / 1000).toFixed(1);
+      }
+      if (obj.compute_per_tick && obj.compute_per_tick.p99_ns != null) {
+        document.getElementById("tv-comp").value = (obj.compute_per_tick.p99_ns / 1000).toFixed(1);
+      }
+      updateTimingVerifier();
+      msg.textContent = "Imported " + (obj.platform || "report") + " JSON.";
+      showToast("Imported rt_report JSON");
+    } catch (err) {
+      msg.textContent = "Invalid JSON: " + err.message;
+    }
+  });
+
+  // ==================== INTERACTIVE LAB 2: 1 kHz CBF SAFETY SHIELD SANDBOX ====================
+  // Exact mirror of SafetyEnvelope::medical_surgical_fixture() & SafetyShield::project() in src/core/safety_shield.cpp
+  var ENV = {
+    wx: 0.22 - 0.015, wy: 0.26 - 0.015, toolR: 0.015,
+    circle: { cx: 0.045, cy: -0.185, r: 0.022, margin: 0.004 },
+    poly: {
+      verts: [
+        { x: 0.010, y: 0.055 },
+        { x: 0.065, y: 0.055 },
+        { x: 0.070, y: 0.095 },
+        { x: 0.015, y: 0.095 }
+      ],
+      margin: 0.003
+    }
+  };
+  var cbfState = { cur: { x: 0.005, y: -0.225 }, des: { x: 0.075, y: -0.155 }, nanFault: false, pulses: 0 };
+
+  function vsub(a, b) { return { x: a.x - b.x, y: a.y - b.y }; }
+  function vadd(a, b) { return { x: a.x + b.x, y: a.y + b.y }; }
+  function vmul(a, s) { return { x: a.x * s, y: a.y * s }; }
+  function vdot(a, b) { return a.x * b.x + a.y * b.y; }
+  function vnorm(a) { return Math.hypot(a.x, a.y); }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  function closestOnSeg(a, b, p) {
+    var ab = vsub(b, a);
+    var l2 = vdot(ab, ab);
+    if (l2 <= 1e-18) return a;
+    var t = clamp(vdot(vsub(p, a), ab) / l2, 0, 1);
+    return vadd(a, vmul(ab, t));
+  }
+
+  function queryConvexPoly(poly, p) {
+    var verts = poly.verts, n = verts.length;
+    var inside = true, bestExt = 1e9, bestExtPt = verts[0], bestExtN = { x: 0, y: 1 };
+    var bestInt = -1e9, bestIntPt = verts[0], bestIntN = { x: 0, y: 1 };
+    for (var i = 0; i < n; i++) {
+      var a = verts[i], b = verts[(i + 1) % n];
+      var e = vsub(b, a), elen = vnorm(e);
+      if (elen <= 1e-12) continue;
+      var outN = { x: e.y / elen, y: -e.x / elen };
+      var planeD = vdot(vsub(p, a), outN);
+      if (planeD > 0) inside = false;
+      if (planeD > bestInt) { bestInt = planeD; bestIntN = outN; bestIntPt = vsub(p, vmul(outN, planeD)); }
+      var q = closestOnSeg(a, b, p);
+      var diff = vsub(p, q), d = vnorm(diff);
+      if (d < bestExt) {
+        bestExt = d; bestExtPt = q;
+        bestExtN = d > 1e-9 ? vmul(diff, 1 / d) : outN;
+      }
+    }
+    return inside
+      ? { signedDist: bestInt, pt: bestIntPt, n: bestIntN }
+      : { signedDist: bestExt, pt: bestExtPt, n: bestExtN };
+  }
+
+  function signedClearance(p, withMargin) {
+    var rEffC = ENV.circle.r + ENV.toolR + (withMargin ? ENV.circle.margin : 0);
+    var cC = Math.hypot(p.x - ENV.circle.cx, p.y - ENV.circle.cy) - rEffC;
+    var pc = queryConvexPoly(ENV.poly, p);
+    var rEffP = ENV.toolR + (withMargin ? ENV.poly.margin : 0);
+    var cP = pc.signedDist - rEffP;
+    return Math.min(cC, cP);
+  }
+
+  function segClearance(a, b, withMargin) {
+    var best = Math.min(signedClearance(a, withMargin), signedClearance(b, withMargin));
+    for (var k = 1; k < 20; k++) {
+      var t = k / 20;
+      var pt = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+      var c = signedClearance(pt, withMargin);
+      if (c < best) best = c;
+    }
+    return best;
+  }
+
+  function projectCBF(cur, des, alpha, maxDelta, nanFault) {
+    var mask = 0;
+    if (nanFault || !isFinite(des.x) || !isFinite(des.y)) {
+      return { safe: cur, mask: 1, rawClr: -0.05, safeClr: signedClearance(cur, false) };
+    }
+    var rawClr = segClearance(cur, des, false);
+    var delta = vsub(des, cur);
+    var dn = vnorm(delta);
+    if (dn > maxDelta) {
+      delta = vmul(delta, maxDelta / dn);
+      mask |= 16;
+    }
+    var p = vadd(cur, delta);
+    var hitWs = false, hitCirc = false, hitPoly = false;
+    for (var pass = 0; pass < 3; pass++) {
+      var cx = clamp(p.x, -ENV.wx, ENV.wx), cy = clamp(p.y, -ENV.wy, ENV.wy);
+      if (Math.abs(cx - p.x) > 1e-12 || Math.abs(cy - p.y) > 1e-12) { p = { x: cx, y: cy }; hitWs = true; }
+      // Circle 0
+      var rEff = ENV.circle.r + ENV.toolR + ENV.circle.margin;
+      var d0 = { x: cur.x - ENV.circle.cx, y: cur.y - ENV.circle.cy };
+      var r0 = vnorm(d0);
+      var n = r0 > 1e-9 ? vmul(d0, 1 / r0) : { x: 0, y: 1 };
+      var rhs = r0 >= rEff ? ((1 - alpha) * r0 + alpha * rEff) : (rEff + 0.002);
+      var proj = vdot({ x: p.x - ENV.circle.cx, y: p.y - ENV.circle.cy }, n);
+      if (proj < rhs) {
+        p = vadd(p, vmul(n, rhs - proj));
+        var tang = { x: -n.y, y: n.x };
+        if (Math.abs(vdot(vsub(p, cur), tang)) < 0.004 && vnorm(vsub(des, cur)) > 0.005) {
+          var sgn = vdot({ x: des.x - ENV.circle.cx, y: des.y - ENV.circle.cy }, tang) >= 0 ? 1 : -1;
+          p = vadd(p, vmul(tang, 0.012 * sgn));
+        }
+        hitCirc = true;
+      }
+      // Polygon 0
+      var rEffP = ENV.toolR + ENV.poly.margin;
+      var pc0 = queryConvexPoly(ENV.poly, cur);
+      var np = pc0.n, rp0 = pc0.signedDist;
+      var rhsP = rp0 >= rEffP ? ((1 - alpha) * rp0 + alpha * rEffP) : (rEffP + 0.002);
+      var projP = vdot(vsub(p, pc0.pt), np);
+      if (projP < rhsP) {
+        p = vadd(p, vmul(np, rhsP - projP));
+        var tangP = { x: -np.y, y: np.x };
+        if (Math.abs(vdot(vsub(p, cur), tangP)) < 0.004 && vnorm(vsub(des, cur)) > 0.005) {
+          var sgnP = vdot(vsub(des, pc0.pt), tangP) >= 0 ? 1 : -1;
+          p = vadd(p, vmul(tangP, 0.012 * sgnP));
+        }
+        hitPoly = true;
+      }
+    }
+    if (segClearance(cur, p, false) < 0 && signedClearance(cur, false) >= 0) { p = cur; hitCirc = true; }
+    if (hitWs) mask |= 2;
+    if (hitCirc) mask |= 4;
+    if (hitPoly) mask |= 8;
+    return { safe: p, mask: mask, rawClr: rawClr, safeClr: segClearance(cur, p, false) };
+  }
+
+  function maskNames(m) {
+    if (!m) return "0x00 (NONE)";
+    var names = [];
+    if (m & 1) names.push("NONFINITE");
+    if (m & 2) names.push("WORKSPACE");
+    if (m & 4) names.push("CIRCLE_CBF");
+    if (m & 8) names.push("POLY_CBF");
+    if (m & 16) names.push("VEL_LIMIT");
+    return "0x" + m.toString(16).toUpperCase().padStart(2, "0") + " (" + names.join("|") + ")";
+  }
+
+  function renderCBF(countPulse) {
+    var alpha = parseFloat(document.getElementById("cbf-alpha").value);
+    var vmax = parseFloat(document.getElementById("cbf-vmax").value) / 1000.0;
+    document.getElementById("cbf-alpha-val").textContent = alpha.toFixed(2);
+    document.getElementById("cbf-vmax-val").textContent = Math.round(vmax * 1000) + " mm";
+
+    var res = projectCBF(cbfState.cur, cbfState.des, alpha, vmax, cbfState.nanFault);
+    if (countPulse && res.mask !== 0) cbfState.pulses += 1;
+
+    var scale = 1000; // 1 m = 1000 SVG px; flip y for Cartesian up
+    function sx(m) { return (m * scale).toFixed(1); }
+    function sy(m) { return (-m * scale).toFixed(1); }
+
+    var polyPts = ENV.poly.verts.map(function(v){ return sx(v.x) + "," + sy(v.y); }).join(" ");
+    var cx = sx(ENV.circle.cx), cy = sy(ENV.circle.cy);
+    var rPhys = (ENV.circle.r * scale).toFixed(1);
+    var rBuf = ((ENV.circle.r + ENV.toolR + ENV.circle.margin) * scale).toFixed(1);
+
+    var svg = ''
+      + '<rect x="-220" y="-260" width="440" height="420" fill="#FBFAF7"/>'
+      + '<rect x="-205" y="-245" width="410" height="390" fill="#FFFFFF" stroke="#D6D1C6" stroke-dasharray="5 4"/>'
+      + '<text x="-198" y="-228" font-size="10.5" fill="#7D776C" font-family="ui-monospace,monospace">MEDICAL_VIAL WORKSPACE (mm)</text>'
+      // Polygon 0
+      + '<polygon points="' + polyPts + '" fill="#FBF3E4" stroke="#B45309" stroke-width="2"/>'
+      + '<text x="40" y="-104" font-size="10" font-weight="700" text-anchor="middle" fill="#9A6700" font-family="ui-monospace,monospace">Polygon 0: Sterile Tray</text>'
+      // Circle 0 + safety envelope
+      + '<circle cx="' + cx + '" cy="' + cy + '" r="' + rBuf + '" fill="#FFF4ED" stroke="#D97706" stroke-width="1.5" stroke-dasharray="4 3"/>'
+      + '<circle cx="' + cx + '" cy="' + cy + '" r="' + rPhys + '" fill="#FDF2F1" stroke="#B42318" stroke-width="2"/>'
+      + '<text x="' + cx + '" y="' + (parseFloat(cy) + 52) + '" font-size="10" font-weight="700" text-anchor="middle" fill="#B42318" font-family="ui-monospace,monospace">Circle 0: Fragile Vial</text>';
+
+    var xCur = sx(cbfState.cur.x), yCur = sy(cbfState.cur.y);
+    var xSafe = sx(res.safe.x), ySafe = sy(res.safe.y);
+
+    if (!cbfState.nanFault) {
+      var xDes = sx(cbfState.des.x), yDes = sy(cbfState.des.y);
+      svg += '<line x1="' + xCur + '" y1="' + yCur + '" x2="' + xDes + '" y2="' + yDes + '" stroke="#B42318" stroke-width="2" stroke-dasharray="4 3"/>';
+      svg += '<circle cx="' + xDes + '" cy="' + yDes + '" r="6" fill="#B42318"/>';
+      svg += '<text x="' + (parseFloat(xDes) + 9) + '" y="' + (parseFloat(yDes) + 4) + '" font-size="10" font-weight="700" fill="#B42318" font-family="ui-monospace,monospace">desired</text>';
+    }
+    svg += '<line x1="' + xCur + '" y1="' + yCur + '" x2="' + xSafe + '" y2="' + ySafe + '" stroke="#2F7D4F" stroke-width="3"/>';
+    svg += '<circle cx="' + xSafe + '" cy="' + ySafe + '" r="7" fill="#2F7D4F" stroke="#FFFFFF" stroke-width="1.5"/>';
+    svg += '<text x="' + (parseFloat(xSafe) + 10) + '" y="' + (parseFloat(ySafe) - 6) + '" font-size="10.5" font-weight="700" fill="#2F7D4F" font-family="ui-monospace,monospace">safe_target</text>';
+    svg += '<circle cx="' + xCur + '" cy="' + yCur + '" r="8" fill="#1C1917" stroke="#F59E0B" stroke-width="2"/>';
+    svg += '<text x="' + (parseFloat(xCur) - 12) + '" y="' + (parseFloat(yCur) + 16) + '" font-size="10" font-weight="700" text-anchor="end" fill="#1C1917" font-family="ui-monospace,monospace">current_pos</text>';
+
+    document.getElementById("cbf-svg").innerHTML = svg;
+    document.getElementById("cbf-raw").textContent = cbfState.nanFault ? "NaN (REJECTED)" : ((res.rawClr * 1000).toFixed(1) + " mm");
+    document.getElementById("cbf-raw").style.color = (cbfState.nanFault || res.rawClr < 0) ? "#B42318" : "#2F7D4F";
+    document.getElementById("cbf-safe").textContent = "+" + Math.max(0, res.safeClr * 1000).toFixed(1) + " mm";
+    document.getElementById("cbf-safe").style.color = "#2F7D4F";
+    document.getElementById("cbf-mask").textContent = maskNames(res.mask);
+    document.getElementById("cbf-pulses").textContent = String(cbfState.pulses);
+    document.getElementById("cbf-des").textContent = cbfState.nanFault ? "(NaN, Inf)" : ("(" + (cbfState.des.x * 1000).toFixed(0) + ", " + (cbfState.des.y * 1000).toFixed(0) + ")");
+    document.getElementById("cbf-out").textContent = "(" + (res.safe.x * 1000).toFixed(0) + ", " + (res.safe.y * 1000).toFixed(0) + ")";
+
+    var badge = document.getElementById("cbf-badge");
+    if (res.mask !== 0) {
+      badge.className = "pill light-amber";
+      badge.textContent = "SHIELD INTERVENED · 0.0 mm Intrusion";
+    } else {
+      badge.className = "pill light-ok";
+      badge.textContent = "PASS-THROUGH · SAFE";
+    }
+  }
+
+  var cbfSvg = document.getElementById("cbf-svg");
+  var cbfDragging = false;
+  function pointerToWorld(evt) {
+    var rect = cbfSvg.getBoundingClientRect();
+    var rx = (evt.clientX - rect.left) / rect.width;
+    var ry = (evt.clientY - rect.top) / rect.height;
+    var vx = -220 + rx * 440;
+    var vy = -260 + ry * 420;
+    cbfState.nanFault = false;
+    cbfState.des = { x: vx / 1000.0, y: -vy / 1000.0 };
+    renderCBF(true);
+  }
+  cbfSvg.addEventListener("pointerdown", function(e){ cbfDragging = true; pointerToWorld(e); });
+  window.addEventListener("pointermove", function(e){ if (cbfDragging) pointerToWorld(e); });
+  window.addEventListener("pointerup", function(){ cbfDragging = false; });
+
+  document.getElementById("cbf-alpha").addEventListener("input", function(){ renderCBF(false); });
+  document.getElementById("cbf-vmax").addEventListener("input", function(){ renderCBF(false); });
+  document.querySelectorAll("[data-cbf-preset]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var p = btn.getAttribute("data-cbf-preset");
+      cbfState.nanFault = false;
+      if (p === "vial") { cbfState.cur = { x: 0.005, y: -0.225 }; cbfState.des = { x: 0.075, y: -0.155 }; }
+      else if (p === "tray") { cbfState.cur = { x: -0.025, y: 0.068 }; cbfState.des = { x: 0.055, y: 0.075 }; }
+      else if (p === "speed") { cbfState.cur = { x: -0.100, y: -0.100 }; cbfState.des = { x: 0.140, y: 0.140 }; }
+      else if (p === "nan") { cbfState.cur = { x: -0.040, y: -0.120 }; cbfState.nanFault = true; }
+      else { cbfState.cur = { x: -0.060, y: -0.110 }; cbfState.des = { x: -0.020, y: -0.070 }; }
+      renderCBF(true);
+    });
+  });
+
+  // ==================== INTERACTIVE LAB 3: QNX 8.0 SECPOL CHECKER ====================
+  var SECPOL_MATRIX = {
+    relmw_supervisor_t: {
+      attach_relmw:  [true,  "allow_attach relmw_supervisor_t { /dev/relmw/status /dev/relmw/events /dev/relmw/ctl }; + abilities { nonroot pathspace public_channel }."],
+      attach_robot0: [false, "DENY (EPERM): Only relmw_robotd_t is permitted in allow_attach for /dev/robot0."],
+      attach_robot1: [false, "DENY (EPERM): /dev/robot1 is not listed in any allow_attach rule."],
+      conn_robotd:   [true,  "allow relmw_supervisor_t relmw_robotd_t:channel connect; (MsgSend _IO_MSG)."],
+      conn_sup:      [false, "DENY (EPERM): Supervisor does not connect to its own external operator channel via secpol."],
+      conn_slog2:    [true,  "allow { relmw_supervisor_t relmw_robotd_t } slogger2_t:channel connect;."],
+      conn_ham:      [true,  "allow relmw_supervisor_t ham_t:channel connect; (ham_attach_self & ham_heartbeat)."],
+      prio_70:       [false, "DENY (EPERM): ability 'priority' is intentionally omitted — control thread runs at 40 <= 63 (unprivileged max)."]
+    },
+    relmw_robotd_t: {
+      attach_relmw:  [false, "DENY (EPERM): Driver cannot hijack /dev/relmw/* control paths."],
+      attach_robot0: [true,  "allow_attach relmw_robotd_t /dev/robot0; + abilities { nonroot pathspace public_channel }."],
+      attach_robot1: [false, "DENY (EPERM): Only exact path /dev/robot0 is allowed (negative target test #3)."],
+      conn_robotd:   [false, "DENY (EPERM): Driver serves /dev/robot0; it has no client connect rule."],
+      conn_sup:      [false, "DENY (EPERM): Compromised driver cannot write commands into /dev/relmw/ctl!"],
+      conn_slog2:    [true,  "allow { relmw_supervisor_t relmw_robotd_t } slogger2_t:channel connect;."],
+      conn_ham:      [false, "DENY (EPERM): Driver does not self-attach to HAM; external HAM monitors CONDDEATH."],
+      prio_70:       [false, "DENY (EPERM): Driver inherits client priority via QNX IPC without needing PROCMGR_AID_PRIORITY."]
+    },
+    relmw_operator_t: {
+      attach_relmw:  [false, "DENY (EPERM): Operator tools hold zero abilities (no pathspace)."],
+      attach_robot0: [false, "DENY (EPERM): Operator tools cannot impersonate /dev/robot0."],
+      attach_robot1: [false, "DENY (EPERM): Operator tools hold zero pathspace abilities."],
+      conn_robotd:   [true,  "allow relmw_operator_t relmw_robotd_t:channel connect; (read-only status via cat /dev/robot0; _IO_MSG write still blocked by 0660 + _IO_FLAG_WR)."],
+      conn_sup:      [true,  "allow relmw_operator_t relmw_supervisor_t:channel connect; (cat /dev/relmw/status, echo > /dev/relmw/ctl)."],
+      conn_slog2:    [false, "DENY (EPERM): Operator type has no slogger2 write rule."],
+      conn_ham:      [false, "DENY (EPERM): Operator cannot tamper with HAM watchdog entities."],
+      prio_70:       [false, "DENY (EPERM): Operator tools hold zero real-time abilities."]
+    },
+    untyped_shell_t: {
+      attach_relmw:  [false, "DENY (EPERM): Untyped shell has no allow_attach rule."],
+      attach_robot0: [false, "DENY (EPERM): Untyped shell cannot register /dev/robot0."],
+      attach_robot1: [false, "DENY (EPERM): Untyped shell lacks pathspace ability."],
+      conn_robotd:   [false, "DENY (EPERM): Untyped shell cannot open /dev/robot0 channel."],
+      conn_sup:      [false, "DENY (EPERM): Even with 0666 mode on /dev/relmw/ctl, QNX secpol blocks channel connect from untyped shells (negative test #1)."],
+      conn_slog2:    [false, "DENY (EPERM): Not in relmw_secpol.txt channel allow-list."],
+      conn_ham:      [false, "DENY (EPERM): Untyped shell cannot connect to HAM channel."],
+      prio_70:       [false, "DENY (EPERM): Unprivileged process cannot exceed priority 63."]
+    }
+  };
+
+  function updateSecpol() {
+    var caller = document.getElementById("sp-caller").value;
+    var op = document.getElementById("sp-op").value;
+    var pair = SECPOL_MATRIX[caller][op];
+    var allowed = pair[0], reason = pair[1];
+    var badge = document.getElementById("sp-badge");
+    badge.className = "pill " + (allowed ? "light-ok" : "light-bad");
+    badge.textContent = allowed ? "ALLOW" : "DENY (EPERM)";
+    document.getElementById("sp-result").innerHTML =
+      '<div class="rule-item ' + (allowed ? "pass" : "fail") + '">'
+      + '<span class="rtag">' + (allowed ? "ALLOW" : "EPERM") + '</span>'
+      + '<span><strong>' + caller + '</strong> &rarr; <code class="inline">' + op + '</code>: ' + reason + '</span>'
+      + '</div>';
+  }
+  document.getElementById("sp-caller").addEventListener("change", updateSecpol);
+  document.getElementById("sp-op").addEventListener("change", updateSecpol);
+
+  // Initialize everything
+  loadState();
+  syncCheckboxesFromState();
+  renderNavAndProgress();
+  updateTimingVerifier();
+  renderCBF(true);
+  updateSecpol();
+})();
+</script>
+</body>
+</html>
