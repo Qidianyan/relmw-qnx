@@ -22,26 +22,31 @@
 
 using namespace relmw::platform;
 
+static long nconf() { return sysconf(_SC_NPROCESSORS_CONF); }
+
+#ifdef __linux__
 static void self_mask(cpu_set_t* out) {
   CPU_ZERO(out);
   pthread_getaffinity_np(pthread_self(), sizeof *out, out);
 }
-
-static long nconf() { return sysconf(_SC_NPROCESSORS_CONF); }
+#endif
 
 TEST(affinity_cpu0_pins_and_reports) {
   std::string err;
   CHECK(set_thread_cluster("_cpu-0", &err));
+#ifdef __linux__
   int on_cpu0 = 0;
   for (int i = 0; i < 1000; ++i)
     { sched_yield(); if (sched_getcpu() == 0) ++on_cpu0; }
   CHECK(on_cpu0 == 1000);
+#endif
   const std::string t = thread_affinity_text();
   CHECK(t == "cpus=0 mask=0x1");
   CHECK(set_thread_cluster("_all", &err));   // leave the default mask for the following tests
 }
 
 TEST(affinity_all_restores_initial_mask) {
+#ifdef __linux__
   cpu_set_t init, cur;
   self_mask(&init);
   std::string err;
@@ -53,6 +58,16 @@ TEST(affinity_all_restores_initial_mask) {
   CHECK(set_thread_cluster("_all", &err));
   self_mask(&cur);
   CHECK(CPU_EQUAL(&init, &cur));
+#else
+  const std::string init = thread_affinity_text();
+  std::string err;
+  if (nconf() > 1) {
+    CHECK(set_thread_cluster("_cpu-0", &err));
+    CHECK(thread_affinity_text() != init);
+  }
+  CHECK(set_thread_cluster("_all", &err));
+  CHECK(thread_affinity_text() == init);
+#endif
 }
 
 TEST(affinity_rejects_bad_names) {
@@ -71,6 +86,7 @@ TEST(affinity_rejects_bad_names) {
   CHECK(set_thread_cluster("_all", &err));
 }
 
+#ifdef __linux__
 TEST(affinity_inherited_by_new_threads) {
   cpu_set_t init;
   CPU_ZERO(&init);
@@ -106,6 +122,7 @@ TEST(affinity_inherited_by_new_threads) {
   CHECK(late_ok);
   CHECK(set_thread_cluster("_all", &err));
 }
+#endif
 
 #endif  // !__QNX__
 

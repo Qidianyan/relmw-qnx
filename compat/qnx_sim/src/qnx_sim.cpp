@@ -24,7 +24,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/dispatch.h>
+#ifndef __APPLE__
 #include <sys/eventfd.h>
+#endif
 #include <sys/iofunc.h>
 #include <sys/iomsg.h>
 #include <sys/neutrino.h>
@@ -50,6 +52,10 @@
 
 #undef open   // this file implements qnxsim_open() and needs the real open()
 
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
+
 namespace {
 
 constexpr uint32_t kMagic = 0x514e5853;  // "QNXS"
@@ -65,6 +71,32 @@ struct Frame {
   uint32_t len = 0;     // payload bytes that follow
   uint32_t dstlen = 0;  // MSG: size of the sender's reply buffer
 };
+
+void mkdirs_early(const std::string& path) {
+  for (size_t i = 1; i < path.size(); ++i)
+    if (path[i] == '/') { std::string p = path.substr(0, i); mkdir(p.c_str(), 0755); }
+  mkdir(path.c_str(), 0755);
+}
+
+void prep_sock_fd(int fd) {
+  if (fd < 0) return;
+  int fl = fcntl(fd, F_GETFD);
+  if (fl >= 0) fcntl(fd, F_SETFD, fl | FD_CLOEXEC);
+#ifdef __APPLE__
+  int one = 1;
+  setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof one);
+#endif
+}
+
+int accept_cloexec(int lfd) {
+#ifdef __APPLE__
+  int c = accept(lfd, nullptr, nullptr);
+  prep_sock_fd(c);
+  return c;
+#else
+  return accept4(lfd, nullptr, nullptr, SOCK_CLOEXEC);
+#endif
+}
 
 bool send_frame(int fd, const Frame& f, const void* data, size_t len, int flags = 0) {
   struct iovec iov[2];
@@ -85,6 +117,31 @@ bool send_frame(int fd, const Frame& f, const void* data, size_t len, int flags 
 
 // Receives one record. Returns 1 on success, 0 on orderly EOF, -1 on error (errno set; EINTR is passed through).
 int recv_frame(int fd, Frame& f, std::vector<char>& payload) {
+#ifdef __APPLE__
+  char* hp = reinterpret_cast<char*>(&f);
+  size_t hgot = 0;
+  while (hgot < sizeof f) {
+    ssize_t r = recv(fd, hp + hgot, sizeof f - hgot, 0);
+    if (r == 0) { if (hgot == 0) return 0; errno = EBADMSG; return -1; }
+    if (r < 0) { if (errno == EINTR && hgot > 0) continue; return -1; }
+    hgot += (size_t)r;
+  }
+  if (f.magic != kMagic || f.len > (1u << 20)) { errno = EBADMSG; return -1; }
+  if (f.len == 0) { payload.clear(); return 1; }
+  char small[512];
+  std::vector<char> big;
+  char* data = small;
+  if (f.len > sizeof small) { big.resize(f.len); data = big.data(); }
+  size_t pgot = 0;
+  while (pgot < f.len) {
+    ssize_t r = recv(fd, data + pgot, f.len - pgot, 0);
+    if (r == 0) { errno = EBADMSG; return -1; }
+    if (r < 0) { if (errno == EINTR) continue; return -1; }
+    pgot += (size_t)r;
+  }
+  payload.assign(data, data + f.len);
+  return 1;
+#else
   ssize_t n = recv(fd, nullptr, 0, MSG_PEEK | MSG_TRUNC);
   if (n == 0) return 0;
   if (n < 0) return -1;
@@ -100,16 +157,36 @@ int recv_frame(int fd, Frame& f, std::vector<char>& payload) {
   if (f.magic != kMagic) { errno = EBADMSG; return -1; }
   payload.assign(data + sizeof f, data + m);
   return 1;
+#endif
 }
 
 std::string abstract_name(int chid) {
   static std::atomic<int> seq{0};
-  char b[96];
-  snprintf(b, sizeof b, "qnxsim.%ld.%d.%d", (long)getpid(), chid, seq.fetch_add(1));
+  char b[64];
+  snprintf(b, sizeof b, "c.%ld.%d.%d", (long)getpid(), chid, seq.fetch_add(1));
   return b;
 }
 
 int make_listener(const std::string& name, bool abstract) {
+#ifdef __APPLE__
+  int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (fd < 0) return -1;
+  prep_sock_fd(fd);
+  std::string path = abstract ? (std::string(qnxsim_root()) + "/.ch/" + name) : name;
+  if (abstract) {
+    mkdirs_early(std::string(qnxsim_root()) + "/.ch");
+    unlink(path.c_str());
+  }
+  struct sockaddr_un a;
+  memset(&a, 0, sizeof a);
+  a.sun_family = AF_UNIX;
+  if (path.size() >= sizeof a.sun_path) { close(fd); errno = ENAMETOOLONG; return -1; }
+  memcpy(a.sun_path, path.data(), path.size());
+  if (bind(fd, (struct sockaddr*)&a, sizeof a) != 0 || listen(fd, 64) != 0) {
+    int e = errno; close(fd); errno = e; return -1;
+  }
+  return fd;
+#else
   int fd = socket(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0);
   if (fd < 0) return -1;
   struct sockaddr_un a;
@@ -127,9 +204,23 @@ int make_listener(const std::string& name, bool abstract) {
   }
   if (bind(fd, (struct sockaddr*)&a, alen) != 0 || listen(fd, 64) != 0) { int e = errno; close(fd); errno = e; return -1; }
   return fd;
+#endif
 }
 
 int connect_to(const std::string& name, bool abstract) {
+#ifdef __APPLE__
+  int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (fd < 0) return -1;
+  prep_sock_fd(fd);
+  std::string path = abstract ? (std::string(qnxsim_root()) + "/.ch/" + name) : name;
+  struct sockaddr_un a;
+  memset(&a, 0, sizeof a);
+  a.sun_family = AF_UNIX;
+  if (path.size() >= sizeof a.sun_path) { close(fd); errno = ENAMETOOLONG; return -1; }
+  memcpy(a.sun_path, path.data(), path.size());
+  if (connect(fd, (struct sockaddr*)&a, sizeof a) != 0) { int e = errno; close(fd); errno = e; return -1; }
+  return fd;
+#else
   int fd = socket(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0);
   if (fd < 0) return -1;
   struct sockaddr_un a;
@@ -146,6 +237,7 @@ int connect_to(const std::string& name, bool abstract) {
   }
   if (connect(fd, (struct sockaddr*)&a, alen) != 0) { int e = errno; close(fd); errno = e; return -1; }
   return fd;
+#endif
 }
 
 // ---- channels ---------------------------------------------------------------------------------------------------
@@ -165,7 +257,8 @@ struct Channel {
   std::vector<std::pair<int, int>> listeners;  // (fd, attach id)
   std::map<int, int> conns;               // fd -> attach id
   std::vector<Received> deferred;         // messages that arrived during MsgReceivePulse()
-  int wakefd = -1;                        // eventfd: ConnectAttach() added a connection, re-build the poll set
+  int wakefd = -1;                        // eventfd (or pipe read end): ConnectAttach() added a connection
+  int wake_wr = -1;                       // eventfd (or pipe write end)
 };
 
 std::mutex g_mu;
@@ -206,7 +299,7 @@ int channel_receive(Channel& ch, Received& out, bool pulses_only) {
       if (!pf[i].revents) continue;
       if (attach[i] == -2) { uint64_t v; ssize_t rr = read(pf[i].fd, &v, sizeof v); (void)rr; continue; }
       if (i < nlisten) {
-        int c = accept4(pf[i].fd, nullptr, nullptr, SOCK_CLOEXEC);
+        int c = accept_cloexec(pf[i].fd);
         if (c >= 0) { std::lock_guard<std::mutex> g(ch.mu); ch.conns[c] = attach[i]; }
         continue;
       }
@@ -288,7 +381,19 @@ int ChannelCreate(unsigned flags) {
   if (fd < 0) return -1;
   fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);   // ConnectAttach() and the receiver may both accept
   ch->listeners.push_back({fd, -1});
+#ifdef __APPLE__
+  int wp[2] = {-1, -1};
+  if (pipe(wp) == 0) {
+    prep_sock_fd(wp[0]); prep_sock_fd(wp[1]);
+    fcntl(wp[0], F_SETFL, fcntl(wp[0], F_GETFL) | O_NONBLOCK);
+    fcntl(wp[1], F_SETFL, fcntl(wp[1], F_GETFL) | O_NONBLOCK);
+    ch->wakefd = wp[0];
+    ch->wake_wr = wp[1];
+  }
+#else
   ch->wakefd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+  ch->wake_wr = ch->wakefd;
+#endif
   g_channels[ch->chid] = ch;
   return ch->chid;
 }
@@ -307,7 +412,11 @@ int ChannelDestroy(int chid) {
   for (auto& c : ch->conns) close(c.first);
   ch->listeners.clear();
   ch->conns.clear();
-  if (ch->wakefd >= 0) { close(ch->wakefd); ch->wakefd = -1; }
+#ifdef __APPLE__
+  unlink((std::string(qnxsim_root()) + "/.ch/" + ch->name).c_str());
+#endif
+  if (ch->wake_wr >= 0 && ch->wake_wr != ch->wakefd) { close(ch->wake_wr); ch->wake_wr = -1; }
+  if (ch->wakefd >= 0) { close(ch->wakefd); ch->wakefd = -1; ch->wake_wr = -1; }
   return 0;
 }
 
@@ -321,11 +430,11 @@ int ConnectAttach(uint32_t, pid_t pid, int chid, unsigned, int) {
   // exists when ConnectAttach() returns, as on QNX, and the receive path never allocates for it later.
   std::lock_guard<std::mutex> g(ch->mu);
   if (!ch->listeners.empty()) {
-    int c = accept4(ch->listeners.front().first, nullptr, nullptr, SOCK_CLOEXEC);
+    int c = accept_cloexec(ch->listeners.front().first);
     if (c >= 0) {
       ch->conns[c] = -1;
       uint64_t one = 1;
-      ssize_t wr = write(ch->wakefd, &one, sizeof one);   // a receiver already in poll() must watch the new fd
+      ssize_t wr = write(ch->wake_wr, &one, sizeof one);   // a receiver already in poll() must watch the new fd
       (void)wr;
     }
   }
@@ -447,8 +556,14 @@ int qnxsim_timer_create(clockid_t clock_id, struct sigevent* evp, timer_t* timer
   if (!evp || evp->sigev_notify != SIGEV_PULSE || !timerid) { errno = ENOTSUP; return -1; }   // pulses only
   auto* t = new SimTimer;
   t->coid = evp->sigev_signo;
+#ifdef __APPLE__
+  uintptr_t packed = (uintptr_t)evp->sigev_notify_attributes;
+  t->prio = (int16_t)(packed & 0xffffu);
+  t->code = (int16_t)((packed >> 16) & 0xffffu);
+#else
   t->prio = evp->_sigev_un._pad[0];
   t->code = evp->_sigev_un._pad[1];
+#endif
   t->value = (long)(intptr_t)evp->sigev_value.sival_ptr;
   *timerid = (timer_t)t;
   return 0;
@@ -499,6 +614,62 @@ void nsec2timespec(struct timespec* ts, uint64_t nsec) {
 }
 
 // ---- runmask / clusters --------------------------------------------------------------------------------------------
+#ifdef __APPLE__
+static uint64_t apple_all_mask() {
+  long n = sysconf(_SC_NPROCESSORS_CONF);
+  if (n <= 0) return 1ULL;
+  if (n >= 64) return ~0ULL;
+  return (1ULL << n) - 1ULL;
+}
+
+static thread_local uint64_t g_sim_runmask = 0;
+static uint64_t& sim_runmask_ref() {
+  if (g_sim_runmask == 0) g_sim_runmask = apple_all_mask();
+  return g_sim_runmask;
+}
+
+int pthread_cluster_get_runmask(char const* name, uint64_t* runmask) {
+  const uint64_t all = apple_all_mask();
+  uint64_t mask = 0;
+  std::string n = name ? name : "";
+  if (n == "_all") {
+    mask = all;
+  } else if (n.rfind("_cpu-", 0) == 0 && n.size() > 5 && n.find_first_not_of("0123456789", 5) == std::string::npos &&
+             n.size() < 8) {
+    int c = atoi(n.c_str() + 5);
+    if (c >= 64 || !(all & (1ULL << c))) return EINVAL;
+    mask = 1ULL << c;
+  } else {
+    return EINVAL;
+  }
+  if (runmask) *runmask = mask;
+  return EOK;
+}
+
+int pthread_cluster_set(pthread_t tid, char const* name) {
+  uint64_t mask = 0;
+  int rc = pthread_cluster_get_runmask(name, &mask);
+  if (rc != EOK) return rc;
+  if (tid != 0 && !pthread_equal(tid, pthread_self())) return EINVAL;
+  sim_runmask_ref() = mask;
+  return EOK;
+}
+
+int pthread_cluster_set_and_inherit(pthread_t tid, char const* name, char const*) { return pthread_cluster_set(tid, name); }
+
+int ThreadCtl(int cmd, void* data) {
+  if (cmd != _NTO_TCTL_RUNMASK_GET_AND_SET) { errno = ENOTSUP; return -1; }
+  unsigned* p = (unsigned*)data;
+  unsigned old = (unsigned)(sim_runmask_ref() & 0xffffffffULL);
+  unsigned want = p ? *p : 0;
+  if (want) {
+    if ((want & ~apple_all_mask()) != 0) { errno = EINVAL; return -1; }
+    sim_runmask_ref() = want;
+  }
+  if (p) *p = old;
+  return 0;
+}
+#else
 static const cpu_set_t& initial_mask() {
   static cpu_set_t m;
   static std::once_flag once;
@@ -555,6 +726,7 @@ int ThreadCtl(int cmd, void* data) {
   if (p) *p = old;
   return 0;
 }
+#endif
 
 // ---- slog2 subset --------------------------------------------------------------------------------------------------
 }  // extern "C"

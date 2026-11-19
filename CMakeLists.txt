@@ -51,6 +51,9 @@ add_library(relmw_core STATIC
   src/core/rng.cpp
   src/core/sim2d.cpp
   src/core/policy.cpp
+  src/core/nn_policy.cpp
+  src/core/safety_shield.cpp
+  src/core/telemetry_bridge.cpp
   src/core/verifier.cpp
   src/core/strategies.cpp
   src/core/retry_policy.cpp
@@ -113,13 +116,16 @@ install(TARGETS relmw_bench relmw_supervisor DESTINATION bin)
 
 # ---- tests (ctest) ----------------------------------------------------------
 enable_testing()
-foreach(t test_rng test_stats test_sim2d test_middleware test_retry_policy test_latency test_posix_platform test_experiment test_rt_noalloc test_robot_link test_plan test_affinity)
+foreach(t test_rng test_stats test_sim2d test_middleware test_retry_policy test_latency test_posix_platform test_experiment test_rt_noalloc test_robot_link test_plan test_affinity test_safety_shield test_nn_policy test_telemetry_bridge)
   if(RELMW_QNX_LAYER AND t STREQUAL "test_posix_platform")
     continue()   # exercises the POSIX control surface (FIFO files); the QNX layer is covered by scripts/target/relmw_target_run.sh
   endif()
   if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/${t}.cpp)
     add_executable(${t} tests/${t}.cpp)
     target_link_libraries(${t} relmw_platform)
+    if(RELMW_QNX AND t STREQUAL "test_telemetry_bridge")
+      target_link_libraries(${t} socket)
+    endif()
     add_test(NAME ${t} COMMAND ${t})
   endif()
 endforeach()
@@ -134,8 +140,8 @@ if(RELMW_QNX_SIM)
 elseif(NOT RELMW_QNX)
   add_test(NAME test_supervisor_e2e COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_supervisor_e2e.sh $<TARGET_FILE:relmw_supervisor> ${CMAKE_CURRENT_SOURCE_DIR}/scripts/relmwctl)
   add_test(NAME test_robotd_e2e COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_robotd_e2e.sh $<TARGET_FILE:relmw_robotd> $<TARGET_FILE:relmw_supervisor>)
-  # QNX 8.0 layer: -fsyntax-only against transcribed API stubs (+ stub self-test). GCC only (stubs wrap glibc headers).
-  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  # QNX 8.0 layer: -fsyntax-only against transcribed API stubs (+ stub self-test).
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_test(NAME test_qnx_syntax COMMAND ${CMAKE_COMMAND} -E env CXX=${CMAKE_CXX_COMPILER} bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/qnx_syntax_check.sh)
   endif()
   find_package(Python3 COMPONENTS Interpreter)
@@ -147,5 +153,6 @@ elseif(NOT RELMW_QNX)
     endif()
     add_test(NAME test_llm_assist COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_llm_assist.py)
     add_test(NAME test_secpol_lint COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_secpol_lint.py)
+    add_test(NAME test_ros2_bridge COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_ros2_bridge.py)
   endif()
 endif()

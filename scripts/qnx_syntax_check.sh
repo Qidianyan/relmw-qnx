@@ -11,6 +11,7 @@ CXX="${CXX:-g++}"
 FLAGS=(-std=c++17 -fsyntax-only -Wall -Wextra -Werror -D__QNX__ -isystem tools/qnx_stubs/include -Iinclude)
 FILES=(src/platform/qnx/qnx_timer.cpp src/platform/qnx/qnx_log.cpp src/platform/qnx/qnx_resmgr.cpp
        src/platform/qnx/qnx_robot_link.cpp src/platform/latency.cpp src/core/robot_link.cpp
+       src/core/safety_shield.cpp src/core/nn_policy.cpp src/core/telemetry_bridge.cpp
        apps/relmw_supervisor.cpp apps/relmw_ham_setup.cpp apps/relmw_robotd.cpp)
 rc=0
 for f in "${FILES[@]}"; do

@@ -1,11 +1,14 @@
 # relmw-qnx — a real-time reliability supervisor for robot manipulation on QNX 8.0
 
-> **Status (2026-11-10): work in progress for the QNX Global Hackathon (Robotics & Medical).**
-> The portable C++ core, host benchmark and tests run today on a Linux host. The QNX 8.0 layer
-> (`src/platform/qnx/`) has been reviewed against the QNX SDP 8.0 documentation and passes a host-side
-> `-fsyntax-only` check against transcribed 8.0 API stubs, but **has not yet been built with qcc or run on a
-> QNX target** — QEMU evidence will be added under `results/qnx_qemu_x86_64/` by `scripts/qnx_first_run.sh`
-> once the QNX SDP 8.0 toolchain is installed. Nothing in this README claims QNX results that are not in the repository.
+> **Status (2026-11-18 — S+ Release for QNX Global Hackathon · Robotics & Medical):**
+> The portable C++17 core, 1 kHz Simplex physical safety shield, zero-dependency Tiny-MLP neural policy (FP32 + Q12),
+> 128-byte CRC-32 telemetry & ROS 2 bridge, dual-screen replay dashboard, and **39 automated test suites** (22 Host +
+> 17 `RELMW_QNX_SIM`) build with `-std=c++17 -O2 -Wall -Wextra -Werror` and pass 100%. The QNX 8.0 native layer
+> (`src/platform/qnx/`) passes `-D__QNX__ -fsyntax-only -Wall -Wextra -Werror` against transcribed QNX SDP 8.0 API
+> stubs (12 translation units + 9 negative rejection self-tests) and runs end-to-end through `compat/qnx_sim/`, but
+> **has not yet been cross-compiled with `qcc`/`q++` or booted on a live QNX 8.0 QEMU/hardware target** — live QEMU
+> evidence will be captured under `results/qnx_qemu_x86_64/` via `scripts/run_qnx80_evidence_pack.sh` once QNX SDP 8.0
+> is installed. Nothing in this README claims QNX target numbers that are not in the repository.
 
 ![architecture](docs/architecture.svg)
 
@@ -34,9 +37,13 @@ On QNX it runs as a **real-time supervisor process**:
 | **SCHED_FIFO / SCHED_SPORADIC** control thread | `qnx_timer.cpp` `set_thread_sched()` |
 | **High Availability Manager**: restart on death; heartbeat entity whose missed-heartbeat condition kills a hung process so the restart takes over; failure library saved atomically and reloaded | `apps/relmw_ham_setup.cpp`, `qnx_timer.cpp` `watchdog_attach()`, `apps/relmw_supervisor.cpp` |
 | **Robot driver as its own resource manager** `/dev/robot0`: fixed-size `_IO_MSG` requests over `MsgSend`/`MsgReply`; if the driver dies the supervisor reconnects and re-runs the episode (process-level recovery on top of task-level rollback) | `src/platform/qnx/qnx_robot_link.cpp`, `apps/relmw_robotd.cpp`, `src/core/robot_link.cpp` |
-| **CPU affinity** of the control thread by cluster (`--cpu N` / `--cluster NAME`: `pthread_cluster_set`, runmask read back with `ThreadCtl`) | `qnx_timer.cpp` `set_thread_cluster()` |
-| **Security policy** draft (least privilege per process type) + host-side lint | `config/secpol/relmw_secpol.txt`, `docs/secpol.md`, `tools/secpol_lint.py` |
+| CPU affinity of the control thread by cluster (`--cpu N` / `--cluster NAME`: `pthread_cluster_set`, runmask read back with `ThreadCtl`) | `qnx_timer.cpp` `set_thread_cluster()` |
+| Security policy draft (least privilege per process type) + host-side lint | `config/secpol/relmw_secpol.txt`, `docs/secpol.md`, `tools/secpol_lint.py` |
 | Release-latency histogram (p50/p99/max, deadline misses) | `src/platform/latency.cpp`, `relmw_supervisor --report` |
+| **1 kHz Simplex Physical Safety Shield** (O(1) Control Barrier Projection, velocity/accel clamping, circular & convex-polygonal surgical No-Go Virtual Fixtures, `SHIELD_INTERVENTION` pulse counter, **0 heap allocations**) | `include/relmw/safety_shield.hpp`, `src/core/safety_shield.cpp` |
+| **Zero-dependency C++17 Tiny-MLP Neural Policy** (`8 -> 32 -> 32 -> 2`, 1,410 trained BC+DAgger parameters in both IEEE `float32` and FPU-free `int16` Q12 fixed-point, **0 heap allocations**) | `include/relmw/nn_policy.hpp`, `include/relmw/nn_policy_weights.hpp`, `src/core/nn_policy.cpp`, `tools/train_nn_policy.py` |
+| **128-byte Zero-Copy Binary Telemetry & ROS 2 / UDP Bridge + Dual-Screen Replay Dashboard** (IEEE CRC-32 `TelemetryFrame`, live trajectory replay of surgical No-Go boundary slide + `kill -9 relmw_robotd` self-healing) | `include/relmw/telemetry_bridge.hpp`, `src/core/telemetry_bridge.cpp`, `tools/ros2_qnx_bridge.py`, `docs/dashboard.html` |
+| **One-click QNX SDP 8.0 QEMU Evidence Packager** (`qcc`/`q++` cross-build, SMP QEMU boot, 5-way 1 kHz RT tests, `tracelogger` `.kev`, HAM crash recovery & SHA-256 tarball) | `scripts/run_qnx80_evidence_pack.sh`, `scripts/target/relmw_target_run.sh` |
 
 ## Results so far (Linux host, simulation only)
 Deterministic C++ 2-D push simulator, scripted policy, N = 100 paired episodes per arm (same seeds),
@@ -132,4 +139,4 @@ The algorithm comes from our earlier Python/MuJoCo prototype (before 2026-11-02)
 repository was written during the hackathon submission period (first commit 2026-11-10).
 
 ## License
-MIT (see `LICENSE`). Copyright (c) 2026 elidot.
+Apache-2.0 (see `LICENSE` and `NOTICE`). Copyright (c) 2026 Qidianyan / ELIDOT AI. Vendored Phosphor Icons (`tools/dashboard_assets/phosphor/`) remain under MIT.

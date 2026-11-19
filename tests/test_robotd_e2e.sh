@@ -16,7 +16,7 @@ set -u
 ROBOTD=${1:-}
 SUP=${2:-}
 
-D=$(mktemp -d) || { echo "test_robotd_e2e: FAIL: mktemp failed" >&2; exit 1; }
+D=$(mktemp -d "${TMPDIR:-/tmp}/relmw_rbd.XXXXXX") || { echo "test_robotd_e2e: FAIL: mktemp failed" >&2; exit 1; }
 PIDS=
 
 cleanup() {

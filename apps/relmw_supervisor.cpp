@@ -18,10 +18,13 @@
 //                    [--heartbeat-ms N] [--robot PATH] [--cpu N | --cluster NAME] [--plan push_A,push_B]
 #include "relmw/experiment.hpp"
 #include "relmw/latency.hpp"
+#include "relmw/nn_policy.hpp"
 #include "relmw/platform.hpp"
 #include "relmw/policy.hpp"
 #include "relmw/robot_link.hpp"
 #include "relmw/robot_link_os.hpp"
+#include "relmw/safety_shield.hpp"
+#include "relmw/telemetry_bridge.hpp"
 #include "relmw/verifier.hpp"
 #include <atomic>
 #include <cerrno>
@@ -61,6 +64,11 @@ struct Shared {
                                       // the control-surface thread, whose own affinity is not the one we report)
   std::string plan;                   // planned subtask order (CSV); empty = built-in order (default)
   std::vector<Subtask> task_proto;    // pristine built-in task; its names validate a plan (dry apply_plan)
+  bool shield_on = false;             // 1 kHz Simplex SafetyShield active on control thread
+  std::uint64_t shield_interventions = 0;
+  std::uint64_t zone_intrusions = 0;
+  PolicyKind policy_kind = PolicyKind::Scripted;
+  CellPreset preset = CellPreset::Standard;
   std::atomic<bool> quit{false};
   std::atomic<size_t> lib_entries{0};   // read by the resmgr thread; the map itself is only touched by the control thread
 };
@@ -117,6 +125,10 @@ std::string status_text(std::int64_t period_ns, size_t lib_entries, const std::s
     << "compute_per_tick_us p50=" << us(S.compute.quantile(0.5)) << " p99=" << us(S.compute.quantile(0.99))
     << " max=" << us(S.compute.max()) << "\n"
     << "control_affinity=" << S.cluster << " " << S.affinity << "\n"
+    << "safety_shield=" << (S.shield_on ? "on" : "off")
+    << " shield_interventions=" << S.shield_interventions
+    << " zone_intrusions=" << S.zone_intrusions
+    << " policy=" << to_string(S.policy_kind) << "\n"
     << "failure_library_entries=" << lib_entries << "\n"
     << "failure_library_file=" << (library_file.empty() ? "-" : library_file) << "\n";
   return o.str();
@@ -161,12 +173,27 @@ std::string handle_command(const std::string& line) {
     push_event("CTL plan " + arg + " (from next episode)");
     return "OK plan " + arg;
   }
+  if (cmd == "shield") {
+    if (arg == "on") S.shield_on = true;
+    else if (arg == "off") S.shield_on = false;
+    else return "ERR shield on|off";
+    push_event("CTL shield " + arg + " (from next episode)");
+    return "OK shield " + arg;
+  }
+  if (cmd == "policy") {
+    if (arg == "scripted") S.policy_kind = PolicyKind::Scripted;
+    else if (arg == "mlp" || arg == "tiny_mlp_fp32") S.policy_kind = PolicyKind::TinyMLP_FP32;
+    else if (arg == "mlp_q12" || arg == "tiny_mlp_q12") S.policy_kind = PolicyKind::TinyMLP_Q12;
+    else return "ERR policy scripted|mlp|mlp_q12";
+    push_event("CTL policy " + arg + " (from next episode)");
+    return "OK policy " + arg;
+  }
   if (cmd == "knock") { S.knock = true; return "OK knock"; }
   if (cmd == "pause") { S.paused = true; return "OK pause"; }
   if (cmd == "resume") { S.paused = false; return "OK resume"; }
   if (cmd == "reset-stats") { S.lat.reset(); S.compute.reset(); return "OK reset-stats"; }
   if (cmd == "quit") { S.quit = true; return "OK quit"; }
-  return "ERR commands: fault <x> | arm <mw|naive|none> | plan <csv> | knock | pause | resume | reset-stats | quit";
+  return "ERR commands: fault <x> | arm <mw|naive|none> | plan <csv> | shield <on|off> | policy <scripted|mlp|mlp_q12> | knock | pause | resume | reset-stats | quit";
 }
 
 // Real-time robot adapter: wraps any RobotAdapter (the in-process PushSim2D or a RemoteRobot over the
@@ -240,6 +267,19 @@ int main(int argc, char** argv) {
     else if (a == "--cpu") cluster = "_cpu-" + next();   // validated strictly by set_thread_cluster
     else if (a == "--cluster") cluster = next();
     else if (a == "--plan") plan_flag = next();
+    else if (a == "--shield") S.shield_on = true;
+    else if (a == "--policy") {
+      std::string p = next();
+      if (p == "scripted") S.policy_kind = PolicyKind::Scripted;
+      else if (p == "mlp" || p == "tiny_mlp_fp32") S.policy_kind = PolicyKind::TinyMLP_FP32;
+      else if (p == "mlp_q12" || p == "tiny_mlp_q12") S.policy_kind = PolicyKind::TinyMLP_Q12;
+      else { std::fprintf(stderr, "unknown --policy %s\n", p.c_str()); return 2; }
+    } else if (a == "--preset") {
+      std::string pr = next();
+      if (pr == "standard") S.preset = CellPreset::Standard;
+      else if (pr == "medical_vial") S.preset = CellPreset::MedicalVial;
+      else { std::fprintf(stderr, "unknown --preset %s\n", pr.c_str()); return 2; }
+    }
     else { std::fprintf(stderr, "see header of apps/relmw_supervisor.cpp for usage\n"); return 2; }
   }
   const bool robot_mode = !robot_path.empty();
@@ -378,8 +418,29 @@ int main(int argc, char** argv) {
                    [&, robot_mode]() -> long {
                      return robot_mode ? remote->last_ticks() : sim->ticks();
                    });
-        ScriptedPushPolicy pol(ecfg.policy_bias_std);
-        pol.new_episode(ep);
+        ScriptedPushPolicy scripted_pol(ecfg.policy_bias_std);
+        TinyMLPPolicy mlp_pol(
+            S.policy_kind == PolicyKind::TinyMLP_Q12 ? MLPInferenceMode::FixedQ12 : MLPInferenceMode::Float32,
+            S.policy_kind == PolicyKind::Scripted ? ecfg.policy_bias_std : 0.12);
+        scripted_pol.new_episode(ep);
+        mlp_pol.new_episode(ep);
+        PolicyKind pol_kind_now;
+        bool shield_now;
+        CellPreset preset_now;
+        {
+          std::lock_guard<std::mutex> g(S.mu);
+          pol_kind_now = S.policy_kind;
+          shield_now = S.shield_on;
+          preset_now = S.preset;
+        }
+        Policy& pol = (pol_kind_now == PolicyKind::Scripted) ? static_cast<Policy&>(scripted_pol)
+                                                             : static_cast<Policy&>(mlp_pol);
+        SafetyShield ep_shield(preset_now == CellPreset::MedicalVial ? SafetyEnvelope::medical_surgical_fixture()
+                                                                     : SafetyEnvelope::industrial_default());
+        ShieldedRobotAdapter shielded_robot(robot, ep_shield, shield_now);
+        RobotAdapter& active_robot = (shield_now || preset_now == CellPreset::MedicalVial)
+                                         ? static_cast<RobotAdapter&>(shielded_robot)
+                                         : static_cast<RobotAdapter&>(robot);
         MiddlewareConfig mc;
         mc.max_retries = arm == "none" ? 0 : 3;
         mc.seed = ep;
@@ -391,7 +452,7 @@ int main(int argc, char** argv) {
         }
         // Reviewer fix: the middleware must drive the RealtimeRobot wrapper (timer pacing, latency histogram, knock,
         // heartbeat), never the raw device; T8 had passed *dev here, which silently bypassed the real-time loop.
-        ReliabilityMiddleware mw(pol, robot, rp, mc, [&](const Event& e) {
+        ReliabilityMiddleware mw(pol, active_robot, rp, mc, [&](const Event& e) {
           char line[256];
           std::snprintf(line, sizeof line, "ep=%d tick=%ld %s %s attempt=%d strategy=%s mode=%s%s", ep, robot.robot_ticks(), to_string(e.type),
                         e.subtask.c_str(), e.attempt, e.strategy.c_str(), to_string(e.mode), e.correlated ? " (correlated)" : "");
@@ -414,6 +475,14 @@ int main(int argc, char** argv) {
           }
         }
         rep = mw.run(task);
+        if (shield_now || preset_now == CellPreset::MedicalVial) {
+          std::lock_guard<std::mutex> g(S.mu);
+          if (shield_now && ep_shield.stats().interventions > 0) {
+            S.shield_interventions += ep_shield.stats().interventions;
+            push_event("SHIELD_INTERVENTION pulses=" + std::to_string(ep_shield.stats().interventions));
+          }
+          S.zone_intrusions += shielded_robot.zone_intrusions();
+        }
         gt = true;
         // Ground truth scores only the planned objects: the middleware's FINAL CHECK re-verifies exactly the
         // subtasks in the (possibly filtered) task vector, so the end-of-episode score must match the plan.

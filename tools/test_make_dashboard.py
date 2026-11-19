@@ -232,7 +232,8 @@ class DashboardTest(unittest.TestCase):
             cmd = [sys.executable, TOOL, "--host", HOST, "--sim", sdir, "--out", os.path.join(td, "d.html")]
             proc = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT)
             self.assertEqual(proc.returncode, 0, proc.stderr)
-            page = open(os.path.join(td, "d.html"), encoding="utf-8").read()
+            with open(os.path.join(td, "d.html"), encoding="utf-8") as fh:
+                page = fh.read()
             m = re.search(r'<div class="simblk".*?class="cap tcap">.*?</p>', page, re.S)
             self.assertIsNotNone(m)
             blk = m.group(0)
@@ -253,6 +254,46 @@ class DashboardTest(unittest.TestCase):
             self.assertGreater(counter.svg_open, 0)
             self.assertEqual(counter.svg_open, counter.svg_close)
             self.assertEqual(page.count("<svg"), page.count("</svg>"))
+
+    def test_zero_blue_cyan_purple_palette_guard(self):
+        """UI aesthetic hard gate: scan every hex, rgb(), hsl(), and named CSS color in dashboard.html and
+        architecture.svg to guarantee ZERO blue, dark-cyan, cyan, or purple hues (except mandated charcoal #16181D)."""
+        import colorsys
+        with tempfile.TemporaryDirectory() as td:
+            page = self.run_gen(os.path.join(td, "dashboard.html"))
+        with open(os.path.join(ROOT, "docs", "architecture.svg"), encoding="utf-8") as fh:
+            arch = fh.read()
+
+        forbidden_names = (
+            "blue", "cyan", "teal", "aqua", "turquoise", "navy", "indigo",
+            "purple", "violet", "magenta", "slateblue", "dodgerblue", "steelblue",
+        )
+        for doc_name, text in (("dashboard.html", page), ("architecture.svg", arch)):
+            # Strip embedded JSON payload before scanning CSS/SVG markup
+            markup = re.sub(r'<script type="application/json".*?</script>', "", text, flags=re.S)
+            for name in forbidden_names:
+                self.assertIsNone(
+                    re.search(rf"(?:color|fill|stroke|background)\s*[:=]\s*['\"]?{name}\b", markup, re.I),
+                    f"Forbidden CSS color name {name!r} in {doc_name}",
+                )
+            self.assertIsNone(re.search(r"hsla?\(", markup, re.I), f"Unexpected hsl() in {doc_name}")
+
+            hex_tokens = re.findall(r"#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})\b", markup)
+            self.assertGreater(len(hex_tokens), 10)
+            for hx in set(hex_tokens):
+                full = "".join(c * 2 for c in hx) if len(hx) == 3 else hx
+                upper = "#" + full.upper()
+                if upper == "#16181D":  # user-mandated charcoal ink
+                    continue
+                r, g, b = (int(full[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+                h, s, _v = colorsys.rgb_to_hsv(r, g, b)
+                deg = h * 360.0
+                # Cyan/Teal/Blue/Indigo/Purple/Magenta span 165 deg .. 315 deg
+                if s > 0.05:
+                    self.assertFalse(
+                        165.0 <= deg <= 315.0,
+                        f"Forbidden blue/cyan/purple color {upper} (hue={deg:.1f} deg, sat={s:.2f}) in {doc_name}",
+                    )
 
 
 if __name__ == "__main__":

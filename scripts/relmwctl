@@ -116,7 +116,7 @@ case $cmd in
       rd "$DIR/status"
       sleep "$secs"
     done;;
-  fault|plan|arm)
+  fault|plan|arm|shield|policy)
     [ -n "$arg" ] || { usage; exit 2; }
     send_cmd "$cmd $arg"; exit $?;;
   knock|pause|resume|reset-stats|quit)

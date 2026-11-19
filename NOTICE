@@ -1,0 +1,9 @@
+relmw-qnx
+Copyright 2026 Qidianyan / ELIDOT AI
+
+This product is licensed under the Apache License, Version 2.0.
+See the LICENSE file for the full license text.
+
+Third-party notices:
+- Phosphor Icons (vendored subset in tools/dashboard_assets/phosphor/) are licensed
+  under the MIT License (see tools/dashboard_assets/phosphor/LICENSE).

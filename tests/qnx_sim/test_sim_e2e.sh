@@ -7,7 +7,7 @@
 set -u
 B=${1:?build dir}
 S=${2:?source dir}
-D=$(mktemp -d) || exit 1
+D=$(mktemp -d "${TMPDIR:-/tmp}/relmw_sim.XXXXXX") || exit 1
 export QNXSIM_ROOT=$D/root
 export RELMW_QNX_SIM=1 QNXSIM_IO=$B/qnxsim_io
 CTL="sh $S/scripts/relmwctl -m /dev/relmw_e2e"

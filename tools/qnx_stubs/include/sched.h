@@ -1,7 +1,18 @@
-// QNX struct sched_param has the POSIX sporadic-server members; glibc's does not. Rename glibc's struct while its
-// struct header is parsed, then declare the QNX 8.0 layout under the real name (pthread.h prototypes then use it).
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 elidot
+// Clean-room minimal type signatures transcribed from public QNX SDP 8.0 documentation for host -fsyntax-only checks.
+// Contains NO QNX SDK proprietary header code.
+// QNX struct sched_param has the POSIX sporadic-server members; glibc/Darwin do not. Rename the host struct while its
+// header is parsed, then declare the QNX 8.0 layout under the real name (pthread.h prototypes then use it).
 #pragma once
 #include <stdint.h>
+#ifdef __APPLE__
+#define sched_param __host_sched_param
+#include <pthread/sched.h>
+#include_next <sched.h>
+#undef sched_param
+#include <time.h>
+#else
 // glibc's bits/sched.h plays its own #define/#undef game on sched_param, so pre-include the one header that defines
 // the struct under a different name; its include guard then stops glibc from defining it again.
 #define sched_param __glibc_sched_param
@@ -9,6 +20,7 @@
 #undef sched_param
 #include_next <sched.h>
 #include <bits/types/struct_timespec.h>
+#endif
 struct sched_param {
   int32_t sched_priority;
   int32_t sched_curpriority;

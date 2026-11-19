@@ -7,6 +7,16 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <time.h>
+#ifdef __APPLE__
+typedef void* timer_t;
+struct itimerspec {
+  struct timespec it_interval;
+  struct timespec it_value;
+};
+#ifndef TIMER_ABSTIME
+#define TIMER_ABSTIME 1
+#endif
+#endif
 #ifdef __cplusplus
 extern "C" {
 #endif

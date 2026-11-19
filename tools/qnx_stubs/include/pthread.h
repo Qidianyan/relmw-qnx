@@ -3,6 +3,7 @@
 // QNX 8.0 cluster API (C Library Reference: pthread_cluster_set(), pthread_cluster_set_and_inherit(),
 // pthread_cluster_get_runmask(); Programmer's Guide "Processor affinity, clusters, runmasks, and inherit masks").
 #pragma once
+#include <sched.h>
 #include_next <pthread.h>
 #include <stdint.h>
 #ifdef __cplusplus

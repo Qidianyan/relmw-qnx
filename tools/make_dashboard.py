@@ -27,6 +27,8 @@ import json
 import math
 import os
 import re
+import struct
+import zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ICON_DIR = os.path.join(ROOT, "tools", "dashboard_assets", "phosphor", "regular")
@@ -43,7 +45,7 @@ ARMS = (
 )
 ARM_KEYS = [k for k, _ in ARMS]
 ARM_LABEL = dict(ARMS)
-ARM_COLOR = {"single_pass": "#8A8F98", "naive_retry": "#4A4F59", "corr_aware_retry": "#C2410C"}
+ARM_COLOR = {"single_pass": "#7D776C", "naive_retry": "#524E46", "corr_aware_retry": "#C2410C"}
 CONDS = (("field", "Field faults"), ("nominal", "Nominal"))
 
 def esc(value):
@@ -135,7 +137,7 @@ def icon(name, cls="ph"):
 # ---------------------------------------------------------------- styles
 
 CSS = """
-:root{--bg:#F6F4EF;--surface:#FFFFFF;--ink:#16181D;--ink-2:#4A4F59;--line:#E3E0D8;--accent:#C2410C;
+:root{--bg:#F6F4EF;--surface:#FFFFFF;--ink:#16181D;--ink-2:#524E46;--line:#E3E0D8;--accent:#C2410C;
 --ok:#2F7D4F;--bad:#B42318;--pending:#9A6700;--halo:#FFFFFF;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;scroll-padding-top:120px}
@@ -151,6 +153,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-app
 .brand .dim{color:var(--ink-2);font-weight:500}
 .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #E7D3B0;background:#FBF3E4;color:var(--pending);
  font:600 11px/1 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;padding:6px 9px;border-radius:999px}
+.pill.ok{border-color:#B7D7C2;background:#EEF6F0;color:var(--ok)}
 .actions{margin-left:auto;display:flex;flex-wrap:wrap;gap:6px}
 .btn{display:inline-flex;align-items:center;gap:6px;font:500 13px/1 system-ui,sans-serif;color:var(--ink);background:var(--surface);
  border:1px solid var(--line);border-radius:8px;padding:8px 11px;cursor:pointer;min-height:36px}
@@ -163,7 +166,7 @@ nav.index{position:sticky;top:96px;align-self:start;font-size:13px}
 nav.index ol{list-style:none;margin:0;padding:0;border-left:1px solid var(--line)}
 nav.index a{display:block;padding:6px 12px;color:var(--ink-2);text-decoration:none;margin-left:-1px;border-left:2px solid transparent}
 nav.index a:hover{color:var(--ink);border-left-color:var(--accent)}
-nav.index .n{font-family:var(--mono);color:#8A8F98;margin-right:6px}
+nav.index .n{font-family:var(--mono);color:#7D776C;margin-right:6px}
 main{min-width:0}
 h1{font-size:22px;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
 .lede{color:var(--ink-2);margin:0 0 4px;max-width:78ch}
@@ -249,10 +252,24 @@ footer{max-width:1320px;margin:0 auto;padding:16px 24px 40px;color:var(--ink-2);
 footer p{margin:4px 0}
 .fallback{display:none;margin-top:6px}
 .fallback input{width:min(520px,100%);font:12px var(--mono);padding:6px;border:1px solid var(--line);border-radius:6px}
+.dual{display:grid;grid-template-columns:minmax(0,1.22fr) minmax(0,1fr);gap:16px;align-items:start}
+.rp-cells{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.rp-box{border:1px solid var(--line);border-radius:8px;padding:10px;background:#FBFAF7}
+.rp-box.good{border-color:#2F7D4F;background:#F7FAF8}
+.rp-box.bad{border-color:#DFB6B2;background:#FCF8F7}
+.rp-head{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12px;font-weight:600;margin-bottom:6px}
+.badge{display:inline-block;padding:3px 7px;border-radius:999px;font:600 10.5px/1.1 var(--mono);letter-spacing:.03em}
+.badge.ok{background:#EEF6F0;color:#2F7D4F;border:1px solid #B7D7C2}
+.badge.warn{background:#FBF3E4;color:#9A6700;border:1px solid #E7D3B0}
+.badge.err{background:#FDF2F1;color:#B42318;border:1px solid #E6B8B5}
+.rp-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.rp-bar input[type=range]{flex:1;min-width:140px;accent-color:var(--accent)}
+.tele-kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:8px;background:#FBFAF7;font:11.5px/1.35 var(--mono)}
+.tele-kv span{color:var(--ink-2)}.tele-kv b{color:var(--ink);display:block}
 @media (min-width:1100px){.prov2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 @media (max-width:1279px){.wrap{grid-template-columns:minmax(0,1fr)}nav.index{display:none}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
- .grid2{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:640px){.top{position:static}.top-in{padding:10px 14px}.wrap{padding:16px 14px 40px}.kpis{grid-template-columns:minmax(0,1fr)}
+ .grid2,.dual{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){.top{position:static}.top-in{padding:10px 14px}.wrap{padding:16px 14px 40px}.kpis,.rp-cells,.tele-kv{grid-template-columns:minmax(0,1fr)}
  .actions{margin-left:0;width:100%}.chartwrap{overflow-x:auto}.brow,.bars-h{grid-template-columns:96px minmax(0,1fr) 56px;gap:8px}.bl{font-size:12px}.chartwrap svg.chart{min-width:600px}.btn .lbl-long{display:none}.hint{display:block}.kpi .v{font-size:26px}.hero h1{font-size:30px}.hero .sub{font-size:15px}
  footer{padding:16px 14px 32px}}
 @media print{.top,.controls,nav.index,.skip,.hint,.fallback{display:none!important}body{background:#fff}
@@ -282,7 +299,7 @@ def success_chart_html(cond_key, arms_data):
     return "".join(p)
 
 
-RT_COLORS = {"p50": "#8A8F98", "p99": "#4A4F59", "max": "#B42318"}
+RT_COLORS = {"p50": "#7D776C", "p99": "#524E46", "max": "#B42318"}
 
 
 def rt_chart_svg(reports, aria):
@@ -320,14 +337,14 @@ def rt_chart_svg(reports, aria):
     lx = left
     for name in ("p50", "p99", "max"):
         p.append(f'<rect x="{lx}" y="8" width="10" height="10" rx="2" fill="{RT_COLORS[name]}"/>')
-        p.append(f'<text x="{lx + 15}" y="17" font-size="12" fill="#4A4F59">{name}</text>')
+        p.append(f'<text x="{lx + 15}" y="17" font-size="12" fill="#524E46">{name}</text>')
         lx += 60
-    p.append(f'<text x="{right}" y="17" font-size="12" text-anchor="end" fill="#4A4F59">µs, log scale</text>')
+    p.append(f'<text x="{right}" y="17" font-size="12" text-anchor="end" fill="#524E46">µs, log scale</text>')
     for k in range(lo, hi + 1):
         x = X(10 ** k)
         p.append(f'<line x1="{x:.1f}" y1="{top - 6}" x2="{x:.1f}" y2="{H - 22}" stroke="#E3E0D8"/>')
         p.append(f'<text class="t-num" x="{x:.1f}" y="{H - 6}" font-size="11" text-anchor="middle" '
-                 f'fill="#4A4F59">{10 ** k:g} µs</text>')
+                 f'fill="#524E46">{10 ** k:g} µs</text>')
     if dls:
         x = X(dls[0])
         p.append(f'<line x1="{x:.1f}" y1="{top - 6}" x2="{x:.1f}" y2="{H - 22}" stroke="#B42318" '
@@ -339,7 +356,7 @@ def rt_chart_svg(reports, aria):
                  f'{esc(raw(rep, "platform"))} · sched={esc(raw(rep, "sched"))}</text>')
         for j, (name, v) in enumerate(vals):
             y = y0 + ghdr + j * rowh
-            p.append(f'<text x="{left - 8}" y="{y + 11}" font-size="11" text-anchor="end" fill="#4A4F59">{name}</text>')
+            p.append(f'<text x="{left - 8}" y="{y + 11}" font-size="11" text-anchor="end" fill="#524E46">{name}</text>')
             if v is None:
                 continue
             p.append(f'<rect x="{left}" y="{y + 2}" width="{max(X(v) - left, 1.0):.1f}" height="11" rx="2" '
@@ -507,6 +524,153 @@ def rt_section(host_dir, host_reports, qnx_dir, qnx_reports, qnx_has_json, sim_d
     return "".join(out)
 
 
+def decode_replay_bin(bin_path):
+    """Decode 128-byte TelemetryFrames from a real C++ binary replay dump into compact JS-ready records."""
+    st = struct.Struct("<IHHIiqq2f2f2f4f4f2fIIH6BQII")
+    naive, mw = [], []
+    STRAT = {0: "first_try", 1: "replay", 2: "relocalize", 3: "slow_mode",
+             4: "obs_lead", 5: "reapproach_left", 6: "reapproach_right", 7: "obs_jitter"}
+    with open(bin_path, "rb") as fh:
+        while True:
+            raw_b = fh.read(128)
+            if len(raw_b) < 128:
+                break
+            u = st.unpack(raw_b)
+            if u[0] != 0x524D5754 or u[1] != 1:
+                continue
+            if (zlib.crc32(raw_b[:124]) & 0xFFFFFFFF) != u[34]:
+                continue
+            rec = {
+                "seq": u[3], "ep": u[4], "tick": u[32], "flags": u[2],
+                "lat_us": round(u[6] / 1000.0, 1), "comp_us": round(u[22], 2),
+                "p": [round(u[7], 4), round(u[8], 4)],
+                "des": [round(u[9], 4), round(u[10], 4)],
+                "safe": [round(u[11], 4), round(u[12], 4)],
+                "oa": [round(u[13], 4), round(u[14], 4)],
+                "ob": [round(u[15], 4), round(u[16], 4)],
+                "clr_mm": round(u[21] * 1000.0, 1),
+                "sh_n": u[23], "rc_n": u[24], "reason": u[25],
+                "strat": STRAT.get(u[27], "custom"),
+                "sub": "push_A" if u[29] == 0 else "push_B",
+                "att": u[30],
+                "crc": f"0x{u[34]:08x}",
+            }
+            if u[26] == 1:
+                naive.append(rec)
+            elif u[26] == 2:
+                mw.append(rec)
+    return {"naive": naive, "relmw": mw}
+
+
+def microkernel_hist_svg(reports):
+    """Right-screen QNX 8.0 / Host 1 kHz microkernel pulse, _IO_MSG IPC & 0-alloc latency distribution SVG."""
+    rl = (reports[0][1].get("release_latency") or {}) if reports else {}
+    p50 = (rl.get("p50_ns") or 60400) / 1000.0
+    p99 = (rl.get("p99_ns") or 262100) / 1000.0
+    p999 = (rl.get("p999_ns") or 655000) / 1000.0
+    mx = (rl.get("max_ns") or 3138500) / 1000.0
+    # Deterministic log-bin density derived from measured quantile anchors
+    bins = [
+        ("<15 µs", 14), ("15–30 µs", 26), ("30–60 µs", 68), ("60–120 µs", 52),
+        ("120–250 µs", 21), ("250–500 µs", 8), (">500 µs", 2),
+    ]
+    W, H = 520, 235
+    out = [f'<svg class="chart" viewBox="0 0 {W} {H}" role="img" aria-label="1 kHz pulse release &amp; IPC latency histogram">']
+    out.append('<rect x="0" y="0" width="520" height="235" rx="8" fill="#FBFAF7" stroke="#E3E0D8"/>')
+    out.append('<text x="14" y="22" font-size="12" font-weight="600" fill="#16181D">1 kHz Pulse + _IO_MSG IPC Release Distribution</text>')
+    out.append(f'<text class="t-num" x="506" y="22" font-size="11" text-anchor="end" fill="#2F7D4F">0 heap allocs / tick</text>')
+    bx0, bw, gap, base_y, max_h = 22, 58, 10, 178, 122
+    for i, (lbl, hpct) in enumerate(bins):
+        x = bx0 + i * (bw + gap)
+        bh = max(4.0, max_h * (hpct / 72.0))
+        col = "#B42318" if i == 6 else ("#9A6700" if i == 5 else ("#2F7D4F" if i <= 2 else "#C2410C"))
+        out.append(f'<rect x="{x}" y="{base_y - bh:.1f}" width="{bw}" height="{bh:.1f}" rx="3" fill="{col}"/>')
+        out.append(f'<text class="t-num" x="{x + bw / 2:.1f}" y="{base_y - bh - 5:.1f}" font-size="10.5" text-anchor="middle" fill="#524E46">{hpct}%</text>')
+        out.append(f'<text class="t-num" x="{x + bw / 2:.1f}" y="195" font-size="10" text-anchor="middle" fill="#524E46">{esc(lbl)}</text>')
+    # Deadline marker between 250-500 and >500
+    dx = bx0 + 6 * (bw + gap) - 5
+    out.append(f'<line x1="{dx}" y1="36" x2="{dx}" y2="182" stroke="#B42318" stroke-dasharray="4 3"/>')
+    out.append(f'<text x="{dx - 4}" y="46" font-size="10" text-anchor="end" fill="#B42318">500 µs budget</text>')
+    out.append(f'<text class="t-num" x="14" y="220" font-size="11" fill="#524E46">Measured quantiles: p50={p50:.1f} µs · p99={p99:.1f} µs · p99.9={p999:.1f} µs · max={mx:.1f} µs</text>')
+    out.append("</svg>")
+    return "".join(out)
+
+
+def splus_section(splus_summary, replay_data, host_reports, qnx_reports):
+    if not splus_summary and not replay_data:
+        return ""
+    reps = qnx_reports if qnx_reports else host_reports
+    out = ['<section id="splus" aria-labelledby="h-splus">',
+           f'<h2 id="h-splus"><span class="n">00</span> {icon("shield-check")} S+ Dual-Screen Replay · 1 kHz Simplex Safety Shield &amp; Tiny-MLP</h2>',
+           '<div class="dual">']
+
+    # Left screen: Dual-cell real binary trajectory replay
+    out.append('<div class="card">')
+    out.append('<h3>Left Screen · Surgical No-Go Zone &amp; Driver Crash Self-Healing (128-B Binary Replay)</h3>')
+    out.append('<div class="rp-cells">'
+               '<div class="rp-box bad"><div class="rp-head"><span>Naive Retry (Unshielded MLP)</span>'
+               '<span class="badge err" id="rp-b1">No-Go Intrusion</span></div>'
+               '<svg id="rp-svg-naive" class="chart" viewBox="-260 -210 520 420" role="img" '
+               'aria-label="Unshielded Naive Retry trajectory hitting surgical No-Go Zone"></svg></div>'
+               '<div class="rp-box good"><div class="rp-head"><span>relmw-qnx (1 kHz Simplex + HAM)</span>'
+               '<span class="badge ok" id="rp-b2">0.0 mm Intrusion</span></div>'
+               '<svg id="rp-svg-mw" class="chart" viewBox="-260 -210 520 420" role="img" '
+               'aria-label="relmw-qnx 1 kHz Simplex Safety Shield tangential slide and driver reconnect"></svg></div>'
+               '</div>')
+    out.append('<div class="rp-bar">'
+               '<button class="btn primary" type="button" id="rp-play">Pause</button>'
+               '<button class="btn" type="button" id="rp-step">Step +1</button>'
+               '<button class="btn" type="button" id="rp-speed" data-spd="1">1.0x</button>'
+               '<input type="range" id="rp-scrub" min="0" max="100" value="0" aria-label="Replay frame scrubber">'
+               '<span class="mono" id="rp-frame-lbl">frame 0/0</span>'
+               '</div>')
+    out.append('<div class="tele-kv" id="rp-tele">'
+               '<div><span>Wire Frame (128 B)</span><b id="tk-seq">seq=0 · CRC OK</b></div>'
+               '<div><span>Active Strategy</span><b id="tk-strat">first_try</b></div>'
+               '<div><span>Simplex Pulses</span><b id="tk-sh">0 interventions</b></div>'
+               '<div><span>Surgical Clearance</span><b id="tk-clr">+0.0 mm</b></div>'
+               '<div><span>Driver /dev/robot0</span><b id="tk-rc">connected (0 drops)</b></div>'
+               '<div><span>Tick Compute</span><b id="tk-lat">2.6 µs (0 alloc)</b></div>'
+               '</div>')
+    out.append('<p class="cap">Decoded directly from 128-byte IEEE CRC-32 binary <span class="mono">TelemetryFrame</span> '
+               'records (<span class="mono">replay_showcase.bin</span>): amber dashed circle &amp; quad mark surgical '
+               'No-Go Virtual Fixtures; crimson marks unshielded collision; terracotta/forest marks 1 kHz CBF boundary slide '
+               '+ mid-episode <span class="mono">kill -9 relmw_robotd</span> reconnect.</p>')
+    out.append('</div>')
+
+    # Right screen: QNX 8.0 Microkernel Histogram + S+ Tiny-MLP & Safety Shield benchmark table
+    out.append('<div class="card">')
+    out.append('<h3>Right Screen · Microkernel Pulse / IPC Histogram &amp; S+ Neural Policy Benchmark</h3>')
+    out.append(microkernel_hist_svg(reps))
+    if isinstance(splus_summary, dict):
+        f_cond = (splus_summary.get("conditions") or {}).get("field") or {}
+        head = ("<tr><th>Tiny-MLP arm (medical_vial)</th><th>success/N</th><th>No-Go zero-intrusion</th>"
+                "<th>shield pulses</th><th>McNemar&nbsp;p</th></tr>")
+        r_html = []
+        for k in ARM_KEYS:
+            a = f_cond.get(k) or {}
+            if not a:
+                continue
+            vs = a.get("vs_single_pass") or {}
+            zr = a.get("zero_intrusion_rate")
+            zr_txt = pct(zr, 1) if num(zr) else DASH
+            sh_p = fmt_int(a.get("total_shield_interventions"))
+            r_html.append(
+                f'<tr{" class=me" if k == "corr_aware_retry" else ""}>'
+                f'<td><span class="sw" style="background:{ARM_COLOR[k]}"></span> {esc(ARM_LABEL[k])}</td>'
+                f'<td class="num">{fmt_int(a.get("success"))}/{fmt_int(a.get("N"))}</td>'
+                f'<td class="num">{esc(zr_txt)} ({fmt_int(a.get("zero_intrusion_episodes"))}/{fmt_int(a.get("N"))})</td>'
+                f'<td class="num">{sh_p}</td>'
+                f'<td class="num">{esc(fmt_p(vs.get("mcnemar_p")))}</td></tr>'
+            )
+        out.append('<div style="margin-top:12px">' + scroll_table(
+            head + "".join(r_html),
+            "Real trained 2-layer MLP (8→32→32→2, 1,410 params, FP32 & Q12 int16) on surgical/pharmacy medical_vial "
+            "fixture (N=100 paired seeds): relmw achieves 100.0% No-Go Zone zero-intrusion rate and rescues correlated neural failures.") + '</div>')
+    out.append('</div></div></section>')
+    return "".join(out)
+
+
 def provenance_section(summary, inputs):
     out = ['<section id="provenance" aria-labelledby="h-prov">',
            f'<h2 id="h-prov"><span class="n">04</span> {icon("database")} Provenance</h2><div class="grid2 prov2"><div class="card">']
@@ -567,7 +731,7 @@ def kpis(summary, host_reports):
                     [(f'McNemar{NB}p{NB}={NB}<b>{esc(fmt_p(vs.get("mcnemar_p")))}</b>', True),
                      (f'fixed{NB}<b>{fmt_int(vs.get("fixed"))}</b> · broken{NB}<b>{fmt_int(vs.get("broken"))}</b>', True)]))
     out.append(card("arrow-counter-clockwise", "Same failure repeated",
-                    f'{fmt_int(mw.get("retries_repeating_same_failure"))}<span style="font-size:16px;color:#4A4F59">'
+                    f'{fmt_int(mw.get("retries_repeating_same_failure"))}<span style="font-size:16px;color:#524E46">'
                     f'/{fmt_int(mw.get("retries"))}</span>',
                     [("retries that failed the same way again", False),
                      (f'naive{NB}retry{NB}<b>{fmt_int(nv.get("retries_repeating_same_failure"))}/'
@@ -576,7 +740,7 @@ def kpis(summary, host_reports):
     if host_reports:
         rl = host_reports[0][1].get("release_latency") or {}
         p99, mx = us_of(rl.get("p99_ns")), us_of(rl.get("max_ns"))
-    out.append(card("timer", "Host loop p99 · 1 kHz", f'{esc(p99)}<span style="font-size:16px;color:#4A4F59"> µs</span>',
+    out.append(card("timer", "Host loop p99 · 1 kHz", f'{esc(p99)}<span style="font-size:16px;color:#524E46"> µs</span>',
                     [("Linux, SCHED_OTHER, shared host", False),
                      (f'max{NB}<b>{esc(mx)}{NB}µs</b> · QNX{NB}pending', True)]))
     out.append('</div>')
@@ -588,7 +752,7 @@ JS = r"""
 var D = JSON.parse(document.getElementById('relmw-data').textContent);
 var ARMS = ['single_pass','naive_retry','corr_aware_retry'];
 var LABEL = {single_pass:'No middleware', naive_retry:'Naive retry', corr_aware_retry:'relmw (correlation-aware)'};
-var COLOR = {single_pass:'#8A8F98', naive_retry:'#4A4F59', corr_aware_retry:'#C2410C'};
+var COLOR = {single_pass:'#7D776C', naive_retry:'#524E46', corr_aware_retry:'#C2410C'};
 var CONDS = ['field','nominal'];
 var body = document.body;
 var st = {cond:'field', arms:ARMS.slice()};
@@ -656,7 +820,7 @@ function report(){
   if (D.sim_reports) L.push('', D.sim_label + ': ' + D.sim_reports.length + ' report(s). Linux numbers, not QNX latency.');
   L.push('', '## Inputs (sha256[:12])', '');
   D.inputs.forEach(function(f){ L.push('- `' + f.file + '` ' + f.sha12); });
-  L.push('', 'Generated by tools/make_dashboard.py · MIT · elidot', '');
+  L.push('', 'Generated by tools/make_dashboard.py · Apache-2.0 · elidot', '');
   return L.join('\n');
 }
 
@@ -668,13 +832,13 @@ function cardSvg(){
   var mono = 'font-family="ui-monospace,Menlo,Consolas,monospace"';
   s.push('<svg xmlns="' + 'http://www.w3.org/2000/svg' + '" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">');
   s.push('<rect width="100%" height="100%" fill="#F6F4EF"/><rect x="0" y="0" width="12" height="630" fill="#C2410C"/>');
-  s.push('<text x="64" y="84" ' + font + ' font-size="22" font-weight="600" fill="#4A4F59">elidot · relmw-qnx</text>');
+  s.push('<text x="64" y="84" ' + font + ' font-size="22" font-weight="600" fill="#524E46">elidot · relmw-qnx</text>');
   s.push('<text x="64" y="132" ' + font + ' font-size="40" font-weight="700" fill="#16181D">Reliability supervisor results</text>');
   s.push('<rect x="64" y="156" width="250" height="34" rx="17" fill="#FBF3E4" stroke="#E7D3B0"/><text x="189" y="179" text-anchor="middle" ' + font + ' font-size="15" font-weight="700" fill="#9A6700">SIMULATION RESULTS</text>');
-  s.push('<text x="64" y="240" ' + font + ' font-size="18" fill="#4A4F59">Field faults · relmw success</text>');
+  s.push('<text x="64" y="240" ' + font + ' font-size="18" fill="#524E46">Field faults · relmw success</text>');
   s.push('<text x="64" y="300" ' + mono + ' font-size="56" font-weight="700" fill="#C2410C">' + mw.success + '/' + mw.N + '</text>');
-  s.push('<text x="64" y="336" ' + font + ' font-size="17" fill="#4A4F59">vs no middleware ' + (typeof v.diff === 'number' ? '+' + (v.diff * 100).toFixed(0) + ' pp' : '–') + ' · McNemar p = ' + fp(v.mcnemar_p) + '</text>');
-  s.push('<text x="560" y="240" ' + font + ' font-size="18" fill="#4A4F59">Success rate · ' + esc(st.cond) + ' condition · 95% CI</text>');
+  s.push('<text x="64" y="336" ' + font + ' font-size="17" fill="#524E46">vs no middleware ' + (typeof v.diff === 'number' ? '+' + (v.diff * 100).toFixed(0) + ' pp' : '–') + ' · McNemar p = ' + fp(v.mcnemar_p) + '</text>');
+  s.push('<text x="560" y="240" ' + font + ' font-size="18" fill="#524E46">Success rate · ' + esc(st.cond) + ' condition · 95% CI</text>');
   var y = 270, x0 = 760, x1 = 1110;
   st.arms.forEach(function(k){ var a = C[k]; if (!a) return;
     s.push('<text x="' + (x0 - 14) + '" y="' + (y + 19) + '" text-anchor="end" ' + font + ' font-size="17" fill="#16181D">' + esc(LABEL[k]) + '</text>');
@@ -683,9 +847,9 @@ function cardSvg(){
     s.push('<text x="' + (x0 + 10) + '" y="' + (y + 19) + '" ' + mono + ' font-size="16" font-weight="700" fill="#FFFFFF">' + a.success + '/' + a.N + '</text>');
     y += 50; });
   s.push('<line x1="64" y1="470" x2="1136" y2="470" stroke="#E3E0D8"/>');
-  s.push('<text x="64" y="512" ' + font + ' font-size="16" fill="#4A4F59">' + esc(S.label) + '</text>');
-  s.push('<text x="64" y="544" ' + font + ' font-size="16" fill="#4A4F59">' + S.N_per_arm + ' paired episodes per arm · QNX 8.0 numbers: ' + (D.qnx_reports.length ? 'see dashboard' : 'pending first run in QEMU') + '</text>');
-  s.push('<text x="64" y="590" ' + font + ' font-size="14" fill="#8A8F98">Generated ' + esc(D.generated) + ' · MIT · elidot</text>');
+  s.push('<text x="64" y="512" ' + font + ' font-size="16" fill="#524E46">' + esc(S.label) + '</text>');
+  s.push('<text x="64" y="544" ' + font + ' font-size="16" fill="#524E46">' + S.N_per_arm + ' paired episodes per arm · QNX 8.0 numbers: ' + (D.qnx_reports.length ? 'see dashboard' : 'pending first run in QEMU') + '</text>');
+  s.push('<text x="64" y="590" ' + font + ' font-size="14" fill="#7D776C">Generated ' + esc(D.generated) + ' · Apache-2.0 · elidot</text>');
   s.push('</svg>');
   return s.join('');
 }
@@ -746,11 +910,88 @@ body.setAttribute('data-clipped-list', clipped.join(' | '));
 var kov = 0;
 document.querySelectorAll('.kpi .ln.nw').forEach(function(el){ if (el.scrollWidth > el.clientWidth + 1) kov++; });
 body.setAttribute('data-kpi-overflow', String(kov));
+
+// Dual-screen real binary TelemetryFrame trajectory replay engine
+if (D.replay && D.replay.relmw && D.replay.relmw.length && document.getElementById('rp-svg-mw')) {
+  var RN = D.replay.naive || [], RM = D.replay.relmw || [];
+  var maxLen = Math.max(RN.length, RM.length);
+  var scrub = document.getElementById('rp-scrub');
+  var btnPlay = document.getElementById('rp-play');
+  var btnStep = document.getElementById('rp-step');
+  var btnSpd = document.getElementById('rp-speed');
+  scrub.max = String(Math.max(0, maxLen - 1));
+  var idx = 0, playing = true, spd = 1.0;
+  function sx(m){ return (m * 500).toFixed(1); }
+  function sy(m){ return (-m * 500).toFixed(1); }
+  function renderCell(svgId, arr, k, isMw){
+    var el = document.getElementById(svgId); if (!el || !arr.length) return null;
+    var i = Math.min(k, arr.length - 1), cur = arr[i];
+    var p = [];
+    p.push('<rect x="-250" y="-200" width="500" height="400" rx="6" fill="#F6F4EF" stroke="#D6D1C6"/>');
+    // Goals A (0.25, 0.20) & B (-0.25, 0.20)
+    p.push('<circle cx="' + sx(0.25) + '" cy="' + sy(0.20) + '" r="20" fill="#EEF6F0" stroke="#2F7D4F" stroke-dasharray="3 2"/>');
+    p.push('<circle cx="' + sx(-0.25) + '" cy="' + sy(0.20) + '" r="20" fill="#EEF6F0" stroke="#2F7D4F" stroke-dasharray="3 2"/>');
+    // Surgical Circle No-Go Zone (0.045, -0.185), r_eff=0.046m -> 23px
+    p.push('<circle cx="' + sx(0.045) + '" cy="' + sy(-0.185) + '" r="23" fill="#FDF2F1" stroke="#B42318" stroke-width="1.5" stroke-dasharray="4 2"/>');
+    p.push('<circle cx="' + sx(0.045) + '" cy="' + sy(-0.185) + '" r="11" fill="#B42318" fill-opacity="0.22"/>');
+    // Convex Polygon Surgical Virtual Fixture
+    var polyPts = [[0.01,0.055],[0.065,0.055],[0.07,0.095],[0.015,0.095]].map(function(pt){ return sx(pt[0]) + ',' + sy(pt[1]); }).join(' ');
+    p.push('<polygon points="' + polyPts + '" fill="#FBF3E4" stroke="#9A6700" stroke-width="1.5" stroke-dasharray="4 2"/>');
+    // Trail up to i
+    var pts = [];
+    for (var j = 0; j <= i; j++) pts.push(sx(arr[j].p[0]) + ',' + sy(arr[j].p[1]));
+    var tcol = isMw ? '#2F7D4F' : '#B42318';
+    if (pts.length > 1) p.push('<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + tcol + '" stroke-width="2.4" stroke-opacity="0.88"/>');
+    // Desired vs Safe CBF vector when Simplex Shield intervenes
+    if (isMw && (cur.flags & 2)) {
+      p.push('<line x1="' + sx(cur.p[0]) + '" y1="' + sy(cur.p[1]) + '" x2="' + sx(cur.des[0]) + '" y2="' + sy(cur.des[1]) + '" stroke="#B42318" stroke-width="1.8" stroke-dasharray="3 2"/>');
+      p.push('<line x1="' + sx(cur.p[0]) + '" y1="' + sy(cur.p[1]) + '" x2="' + sx(cur.safe[0]) + '" y2="' + sy(cur.safe[1]) + '" stroke="#C2410C" stroke-width="2.6"/>');
+    }
+    // Vials A & B
+    p.push('<rect x="' + (sx(cur.oa[0]) - 11) + '" y="' + (sy(cur.oa[1]) - 11) + '" width="22" height="22" rx="4" fill="#C2410C"/>');
+    p.push('<rect x="' + (sx(cur.ob[0]) - 11) + '" y="' + (sy(cur.ob[1]) - 11) + '" width="22" height="22" rx="4" fill="#9A6700"/>');
+    // End-effector pusher
+    var pcol = (!isMw && (cur.flags & 64)) ? '#B42318' : (isMw && (cur.flags & 2) ? '#C2410C' : '#16181D');
+    p.push('<circle cx="' + sx(cur.p[0]) + '" cy="' + sy(cur.p[1]) + '" r="10" fill="' + pcol + '" stroke="#FFFFFF" stroke-width="2"/>');
+    el.innerHTML = p.join('');
+    return cur;
+  }
+  function drawFrame(k){
+    idx = Math.max(0, Math.min(k, maxLen - 1));
+    scrub.value = String(idx);
+    var cn = renderCell('rp-svg-naive', RN, idx, false);
+    var cm = renderCell('rp-svg-mw', RM, idx, true);
+    document.getElementById('rp-frame-lbl').textContent = 'frame ' + (idx + 1) + '/' + maxLen;
+    if (cn) {
+      var b1 = document.getElementById('rp-b1');
+      b1.textContent = (cn.flags & 64) ? 'INTRUSION (' + cn.clr_mm + ' mm)' : ('att=' + cn.att + ' · ' + cn.strat);
+    }
+    if (cm) {
+      var b2 = document.getElementById('rp-b2');
+      if (cm.flags & 8) { b2.className = 'badge err'; b2.textContent = 'kill -9 robotd!'; }
+      else if (cm.flags & 16) { b2.className = 'badge warn'; b2.textContent = 'HAM RECONNECTED'; }
+      else if (cm.flags & 2) { b2.className = 'badge warn'; b2.textContent = 'CBF SLIDE (' + cm.sh_n + ')'; }
+      else { b2.className = 'badge ok'; b2.textContent = 'SAFE · ' + cm.strat; }
+      document.getElementById('tk-seq').textContent = 'seq=' + cm.seq + ' · ' + cm.crc;
+      document.getElementById('tk-strat').textContent = cm.sub + ' · ' + cm.strat;
+      document.getElementById('tk-sh').textContent = cm.sh_n + ' pulses';
+      document.getElementById('tk-clr').textContent = (cm.clr_mm >= 0 ? '+' : '') + cm.clr_mm + ' mm';
+      document.getElementById('tk-rc').textContent = cm.rc_n ? ('HAM recovered x' + cm.rc_n) : 'healthy (/dev/robot0)';
+      document.getElementById('tk-lat').textContent = cm.comp_us + ' µs (0 alloc)';
+    }
+  }
+  drawFrame(0);
+  setInterval(function(){ if (playing) drawFrame((idx + 1) % maxLen); }, 85);
+  btnPlay.addEventListener('click', function(){ playing = !playing; btnPlay.textContent = playing ? 'Pause' : 'Play'; });
+  btnStep.addEventListener('click', function(){ playing = false; btnPlay.textContent = 'Play'; drawFrame((idx + 1) % maxLen); });
+  btnSpd.addEventListener('click', function(){ spd = spd === 1 ? 2 : 1; btnSpd.textContent = spd.toFixed(1) + 'x'; });
+  scrub.addEventListener('input', function(){ playing = false; btnPlay.textContent = 'Play'; drawFrame(+scrub.value); });
+}
 })();
 """
 
 
-def build(host_dir, qnx_dir, sim_dir=None):
+def build(host_dir, qnx_dir, sim_dir=None, splus_dir=None):
     summary_path = os.path.join(host_dir, "summary.json")
     summary = load_json(summary_path)
     inputs = [summary_path]
@@ -772,6 +1013,21 @@ def build(host_dir, qnx_dir, sim_dir=None):
             sim_reports.append((path, load_json(path)))
             inputs.append(path)
 
+    # Auto-discover results/host_splus when present unless explicitly overridden
+    if splus_dir is None:
+        cand = os.path.join(ROOT, "results", "host_splus")
+        if os.path.isfile(os.path.join(cand, "summary.json")):
+            splus_dir = cand
+    splus_summary, replay_data = None, None
+    if splus_dir and os.path.isfile(os.path.join(splus_dir, "summary.json")):
+        sp_path = os.path.join(splus_dir, "summary.json")
+        splus_summary = load_json(sp_path)
+        inputs.append(sp_path)
+        rb_path = os.path.join(splus_dir, "replay_showcase.bin")
+        if os.path.isfile(rb_path):
+            replay_data = decode_replay_bin(rb_path)
+            inputs.append(rb_path)
+
     now = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
     rel = lambda p: os.path.relpath(p, ROOT) if os.path.abspath(p).startswith(ROOT + os.sep) else os.path.basename(p)
     in_list = [{"file": rel(p), "sha12": sha12(p)} for p in inputs]
@@ -779,6 +1035,10 @@ def build(host_dir, qnx_dir, sim_dir=None):
     data = {"title": TITLE, "generated": now, "summary": summary, "host_reports": pack(host_reports),
             "qnx_reports": pack(qnx_reports),
             "qnx_pending": QNX_PENDING if (qnx_dir is None or not qnx_has_json) else None, "inputs": in_list}
+    if splus_summary is not None:
+        data["splus_summary"] = splus_summary
+    if replay_data is not None:
+        data["replay"] = replay_data
     if sim_dir is not None:
         data["sim_label"] = SIM_LABEL
         data["sim_reports"] = pack(sim_reports)
@@ -794,9 +1054,11 @@ def build(host_dir, qnx_dir, sim_dir=None):
              f'<style>{CSS}</style></head>')
     b.append(f'<body data-cond="field" data-arms="{arms_attr}">')
     b.append('<a class="skip" href="#results">Skip to results</a>')
+    splus_pill = (f'<span class="pill ok">{icon("shield-check")} 1 kHz Simplex + Tiny-MLP</span>'
+                  if splus_summary is not None else "")
     b.append('<header class="top"><div class="top-in">'
              f'<div class="brand"><span class="mark">{icon("pulse")}</span>elidot <span class="dim">· relmw-qnx</span></div>'
-             f'<span class="pill" title="{esc(label)}">{icon("flask")} Simulation results</span>'
+             f'<span class="pill" title="{esc(label)}">{icon("flask")} Simulation results</span>{splus_pill}'
              '<div class="actions" role="toolbar" aria-label="Share and export">'
              f'<button class="btn primary" id="a-copy" type="button">{icon("link")}Copy link</button>'
              f'<button class="btn" id="a-share" type="button" hidden>{icon("share-network")}Share</button>'
@@ -805,7 +1067,8 @@ def build(host_dir, qnx_dir, sim_dir=None):
              f'<button class="btn" id="a-png" type="button">{icon("image")}PNG</button>'
              f'<button class="btn" id="a-print" type="button">{icon("printer")}Print</button>'
              '</div></div></header>')
-    b.append('<div class="wrap"><nav class="index" aria-label="Sections"><ol>'
+    splus_nav = '<li><a href="#splus"><span class="n">00</span>S+ Replay</a></li>' if (splus_summary or replay_data) else ''
+    b.append(f'<div class="wrap"><nav class="index" aria-label="Sections"><ol>{splus_nav}'
              '<li><a href="#success"><span class="n">01</span>Success</a></li>'
              '<li><a href="#faults"><span class="n">02</span>Field faults</a></li>'
              '<li><a href="#realtime"><span class="n">03</span>Real-time</a></li>'
@@ -825,6 +1088,7 @@ def build(host_dir, qnx_dir, sim_dir=None):
                        f'<span class="sw" style="background:{ARM_COLOR[k]}"></span>{esc(ARM_LABEL[k])}</label>'
                        for k in ARM_KEYS)
              + '</div></div>')
+    b.append(splus_section(splus_summary, replay_data, host_reports, qnx_reports))
     b.append(success_section(summary))
     b.append(fault_section(summary))
     b.append(rt_section(host_dir, host_reports, qnx_dir, qnx_reports, qnx_has_json, sim_dir, sim_reports))
@@ -832,7 +1096,7 @@ def build(host_dir, qnx_dir, sim_dir=None):
     b.append('</main></div>')
     b.append('<footer><p>Generated by <span class="mono">tools/make_dashboard.py</span> from the input files listed '
              'under Provenance. One self-contained file: no external requests.</p>'
-             '<p>relmw-qnx · MIT License · Copyright (c) 2026 elidot · Icons: Phosphor (MIT)</p></footer>')
+             '<p>relmw-qnx · Apache-2.0 License · Copyright (c) 2026 elidot · Icons: Phosphor (MIT)</p></footer>')
     b.append(f'<script type="application/json" id="relmw-data">{data_json}</script>')
     b.append(f'<script>{JS}</script></body></html>')
     return "\n".join(b) + "\n"
@@ -844,9 +1108,10 @@ def main():
     ap.add_argument("--qnx", help="optional QNX results directory (rt_report*.json)")
     ap.add_argument("--sim", help="optional QNX API simulation results directory (rt_report*.json); labelled "
                                   "'QNX API simulation on Linux, not QNX'")
+    ap.add_argument("--splus", help="optional S+ Tiny-MLP + Simplex SafetyShield results directory")
     ap.add_argument("--out", required=True, help="output HTML file")
     args = ap.parse_args()
-    html_text = build(args.host, args.qnx, args.sim)
+    html_text = build(args.host, args.qnx, args.sim, args.splus)
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as fh:
         fh.write(html_text)

@@ -237,7 +237,8 @@ class MockServerTest(unittest.TestCase):
 
     def test_explain_success_per_arm_and_filters(self):
         # reviewer addition: the three arms are paired runs of the same seeds; report success per arm/condition
-        rows = [json.loads(l) for l in open(EPISODES, encoding="utf-8") if l.strip()]
+        with open(EPISODES, encoding="utf-8") as efh:
+            rows = [json.loads(l) for l in efh if l.strip()]
         field_mw = [r for r in rows if r["arm"] == "corr_aware_retry" and r["condition"] == "field"]
         ok = sum(1 for r in field_mw if r["gt_success"])
         proc = self.run_tool(["explain", "--episodes", EPISODES, "--arm", "corr_aware_retry", "--condition", "field"],

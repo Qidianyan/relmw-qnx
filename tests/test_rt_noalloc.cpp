@@ -8,10 +8,13 @@
 #include "minitest.hpp"
 #include "relmw/experiment.hpp"
 #include "relmw/latency.hpp"
+#include "relmw/nn_policy.hpp"
 #include "relmw/platform.hpp"
 #include "relmw/policy.hpp"
 #include "relmw/robot_link.hpp"
+#include "relmw/safety_shield.hpp"
 #include "relmw/sim2d.hpp"
+#include "relmw/telemetry_bridge.hpp"
 
 #include <atomic>
 #include <cstddef>
@@ -190,6 +193,77 @@ TEST(rt_remote_robot_step_no_alloc) {
     CHECK(ca.n() == 0);
   }
   CHECK(robot.ticks() == 2010);
+}
+
+// 8. 1 kHz Simplex SafetyShield::project() x100k (circle + polygon surgical No-Go Zones + velocity/accel clamps
+//    + SHIELD_INTERVENTION pulse callback) -> 0 allocations.
+namespace {
+void count_pulse_cb(void* ctx, std::uint32_t, std::uint64_t) {
+  auto* n = static_cast<std::uint64_t*>(ctx);
+  ++(*n);
+}
+}  // namespace
+
+TEST(rt_safety_shield_project_no_alloc) {
+  relmw::SafetyShield shield(relmw::SafetyEnvelope::medical_surgical_fixture());
+  std::uint64_t pulses = 0;
+  shield.set_pulse_hook(&count_pulse_cb, &pulses);
+  relmw::Vec2 pos{0.0, -0.30};
+  {
+    CountAllocs ca;
+    for (int i = 0; i < 100000; ++i) {
+      // Alternate between direct hits into Circle 0, Polygon 0, and workspace boundary
+      const relmw::Vec2 tgt = (i & 1) ? relmw::Vec2{0.045, -0.185} : relmw::Vec2{0.025, 0.070};
+      const relmw::ShieldDecision dec = shield.project(pos, tgt);
+      pos = pos + (dec.safe_target - pos) * 0.1;
+    }
+    CHECK(ca.n() == 0);
+  }
+  CHECK(pulses > 0);
+  CHECK(shield.stats().total_ticks == 100000);
+}
+
+// 9. TinyMLPPolicy::act() x20000 (10k Float32 + 10k FixedQ12) -> 0 allocations.
+TEST(rt_nn_policy_act_no_alloc) {
+  relmw::TinyMLPPolicy pol_fp(relmw::MLPInferenceMode::Float32, 0.10);
+  relmw::TinyMLPPolicy pol_q12(relmw::MLPInferenceMode::FixedQ12, 0.10);
+  pol_fp.new_episode(42);
+  pol_q12.new_episode(42);
+  relmw::Obs obs;
+  obs.pusher = relmw::Vec2{0.02, -0.18};
+  obs.obj[0] = relmw::Vec2{0.12, -0.02};
+  obs.obj[1] = relmw::Vec2{-0.12, -0.02};
+  relmw::SubtaskMeta meta{0, relmw::goal_of(0)};
+  relmw::Perturb p{false, 0, 0};
+  const std::string sub = "push_A";   // pre-allocated outside hot loop
+  {
+    CountAllocs ca;
+    volatile double sink = 0.0;
+    for (int i = 0; i < 10000; ++i) {
+      const relmw::Vec2 a = pol_fp.act(obs, sub, meta, p);
+      const relmw::Vec2 b = pol_q12.act(obs, sub, meta, p);
+      sink += a.x + b.y;
+    }
+    (void)sink;
+    CHECK(ca.n() == 0);
+  }
+}
+
+// 10. TelemetryRing::emit() x10000 (128-byte binary frame + IEEE CRC-32) -> 0 allocations.
+TEST(rt_telemetry_emit_no_alloc) {
+  relmw::TelemetryRing ring(512);   // pre-allocated ring buffer
+  relmw::TelemetryFrame f{};
+  f.episode = 1001;
+  f.flags = relmw::kTelShieldEnabled | relmw::kTelShieldIntervened;
+  {
+    CountAllocs ca;
+    for (int i = 0; i < 10000; ++i) {
+      f.tick = static_cast<std::uint64_t>(i);
+      ring.emit(f);
+    }
+    CHECK(ca.n() == 0);
+  }
+  CHECK(ring.total_emitted() == 10000);
 }
 
 TEST_MAIN()

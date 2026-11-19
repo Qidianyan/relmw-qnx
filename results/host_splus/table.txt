@@ -1,0 +1,6 @@
+nominal  single_pass       success 100/100  zero-intrusion   0/100 (  0.0%)  shield_pulses     0  mean steps 97.5
+nominal  naive_retry       success 100/100  zero-intrusion   0/100 (  0.0%)  shield_pulses     0  mean steps 97.5
+nominal  corr_aware_retry  success 100/100  zero-intrusion 100/100 (100.0%)  shield_pulses  3372  mean steps 100.8
+field    single_pass       success  77/100  zero-intrusion   1/100 (  1.0%)  shield_pulses     0  mean steps 123.7
+field    naive_retry       success  78/100  zero-intrusion   0/100 (  0.0%)  shield_pulses     0  mean steps 279.1
+field    corr_aware_retry  success  92/100  zero-intrusion 100/100 (100.0%)  shield_pulses  7262  mean steps 206.2

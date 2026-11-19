@@ -1,116 +1,128 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="17" fill="#16181D">
-  <title>relmw-qnx architecture</title>
-  <desc>Two QNX processes (supervisor and robot driver) talking by message passing, supervised by HAM, operated through /dev/relmw. SPDX-License-Identifier: MIT. Copyright (c) 2026 elidot.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="920" viewBox="0 0 1600 920" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="17" fill="#16181D">
+  <title>relmw-qnx S+ runtime assurance architecture</title>
+  <desc>Two QNX 8.0 processes (real-time supervisor with 1 kHz Simplex Safety Shield + Tiny-MLP policy and /dev/robot0 driver) communicating over native message passing, supervised by HAM, with 128-byte zero-copy ROS 2 telemetry. SPDX-License-Identifier: MIT. Copyright (c) 2026 elidot.</desc>
   <defs>
-    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A4F59"/></marker>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#524E46"/></marker>
     <marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#C2410C"/></marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2F7D4F"/></marker>
     <style>
-      .t{font-weight:700;font-size:19px}.s{font-size:15px;fill:#4A4F59}.m{font-family:"DejaVu Sans Mono",Menlo,monospace;font-size:15px}
-      .k{font-size:13px;letter-spacing:1.5px;fill:#4A4F59;font-weight:700}.box{fill:#fff;stroke:#D6D2C8;stroke-width:1.5}
+      .t{font-weight:700;font-size:19px}.s{font-size:15px;fill:#524E46}.m{font-family:"DejaVu Sans Mono",Menlo,monospace;font-size:15px}
+      .k{font-size:13px;letter-spacing:1.5px;fill:#524E46;font-weight:700}.box{fill:#FFFFFF;stroke:#D6D1C6;stroke-width:1.5}
       .proc{fill:#FBFAF7;stroke:#16181D;stroke-width:2}.hot{fill:#FFF4ED;stroke:#C2410C;stroke-width:2}
-      .ln{stroke:#4A4F59;stroke-width:2;fill:none}.lo{stroke:#C2410C;stroke-width:2.5;fill:none}.lab{font-size:14px;fill:#4A4F59}
+      .safe{fill:#EEF6F0;stroke:#2F7D4F;stroke-width:2}
+      .ln{stroke:#524E46;stroke-width:2;fill:none}.lo{stroke:#C2410C;stroke-width:2.5;fill:none}.lg{stroke:#2F7D4F;stroke-width:2.2;fill:none}.lab{font-size:14px;fill:#524E46}
     </style>
   </defs>
-  <rect width="1600" height="900" fill="#F6F4EF"/>
-  <text x="40" y="52" font-size="30" font-weight="700">relmw-qnx · reliability supervisor on QNX OS 8.0</text>
-  <text x="40" y="82" class="s">Two processes, QNX message passing between them, HAM restarts either one, operators use plain files.</text>
+  <rect width="1600" height="920" fill="#F6F4EF"/>
+  <text x="40" y="50" font-size="30" font-weight="700">relmw-qnx · S+ Runtime Assurance &amp; 1 kHz Simplex Safety Shield on QNX OS 8.0</text>
+  <text x="40" y="80" class="s">Dual microkernel processes, 0-alloc 1 kHz Control Barrier Projection, Tiny-MLP neural inference, HAM crash recovery &amp; 128-B ROS 2 bridge.</text>
 
-  <!-- operators -->
-  <rect x="40" y="130" width="330" height="200" rx="10" class="box"/>
-  <text x="60" y="160" class="k">OPERATOR · HMI · SCRIPTS</text>
-  <text x="60" y="192" class="m">cat /dev/relmw/status</text>
-  <text x="60" y="216" class="m">cat /dev/relmw/events</text>
-  <text x="60" y="240" class="m">echo "fault bump" &gt;</text>
-  <text x="60" y="262" class="m">     /dev/relmw/ctl</text>
-  <text x="60" y="300" class="s">scripts/relmwctl wraps these</text>
+  <!-- operators & ROS 2 -->
+  <rect x="40" y="120" width="330" height="190" rx="10" class="box"/>
+  <text x="60" y="150" class="k">OPERATOR · HMI · SCRIPTS</text>
+  <text x="60" y="180" class="m">cat /dev/relmw/status</text>
+  <text x="60" y="204" class="m">echo "shield on" &gt; /dev/relmw/ctl</text>
+  <text x="60" y="228" class="m">echo "policy mlp" &gt; /dev/relmw/ctl</text>
+  <text x="60" y="252" class="m">echo "fault percep_bias" &gt; ctl</text>
+  <text x="60" y="286" class="s">scripts/relmwctl wraps POSIX/QNX</text>
 
-  <rect x="40" y="370" width="330" height="170" rx="10" class="box" stroke-dasharray="6 5"/>
-  <text x="60" y="400" class="k">HOST-SIDE PLANNER (OFF RT PATH)</text>
-  <text x="60" y="430" class="m">tools/llm_assist.py plan</text>
-  <text x="60" y="456" class="s">sentence → closed-vocabulary</text>
-  <text x="60" y="478" class="s">subtask order, offline fallback</text>
-  <text x="60" y="512" class="m">plan push_B,push_A → ctl</text>
+  <rect x="40" y="334" width="330" height="165" rx="10" class="box" stroke-dasharray="6 5"/>
+  <text x="60" y="362" class="k">HOST LLM PLANNER (OFF RT PATH)</text>
+  <text x="60" y="390" class="m">tools/llm_assist.py plan</text>
+  <text x="60" y="416" class="s">closed-vocabulary subtask order</text>
+  <text x="60" y="440" class="s">strict schema + offline fallback</text>
+  <text x="60" y="472" class="m">plan push_B,push_A → ctl</text>
+
+  <rect x="40" y="522" width="330" height="168" rx="10" class="safe"/>
+  <text x="60" y="550" class="k" fill="#2F7D4F">ROS 2 / UDP ZERO-COPY BRIDGE</text>
+  <text x="60" y="578" class="m">TelemetryFrame (128 B + CRC32)</text>
+  <text x="60" y="604" class="m">tools/ros2_qnx_bridge.py</text>
+  <text x="60" y="630" class="s">/relmw/diagnostics · /relmw/pose</text>
+  <text x="60" y="656" class="s">dual-screen replay: dashboard.html</text>
 
   <!-- supervisor process -->
-  <rect x="420" y="120" width="700" height="560" rx="14" class="proc"/>
-  <text x="444" y="152" class="t">relmw_supervisor</text>
-  <text x="636" y="152" class="s">apps/relmw_supervisor.cpp</text>
+  <rect x="420" y="114" width="700" height="576" rx="14" class="proc"/>
+  <text x="444" y="146" class="t">relmw_supervisor</text>
+  <text x="636" y="146" class="s">apps/relmw_supervisor.cpp · TinyMLPPolicy (FP32 / Q12 int16)</text>
 
-  <rect x="444" y="172" width="300" height="150" rx="10" class="box"/>
-  <text x="462" y="200" class="k">RESOURCE MANAGER THREAD</text>
-  <text x="462" y="228" class="m">/dev/relmw/{status,events,ctl}</text>
-  <text x="462" y="254" class="s">resmgr_attach · io_read · io_write</text>
-  <text x="462" y="278" class="s">dispatch_block → dispatch_handler</text>
-  <text x="462" y="306" class="s">qnx_resmgr.cpp</text>
+  <rect x="444" y="166" width="300" height="148" rx="10" class="box"/>
+  <text x="462" y="194" class="k">RESOURCE MANAGER THREAD</text>
+  <text x="462" y="222" class="m">/dev/relmw/{status,events,ctl}</text>
+  <text x="462" y="248" class="s">resmgr_attach · io_read · io_write</text>
+  <text x="462" y="272" class="s">dispatch_block → dispatch_handler</text>
+  <text x="462" y="298" class="s">qnx_resmgr.cpp</text>
 
-  <rect x="772" y="172" width="324" height="320" rx="10" class="hot"/>
-  <text x="790" y="200" class="k">CONTROL THREAD · 1 kHz</text>
-  <text x="790" y="228" class="m">timer_create → SIGEV_PULSE</text>
-  <text x="790" y="252" class="m">→ MsgReceivePulse</text>
-  <text x="790" y="280" class="s">SCHED_FIFO or SCHED_SPORADIC</text>
-  <text x="790" y="304" class="s">runmask: --cpu N (pthread_cluster_set)</text>
-  <text x="790" y="340" class="t" font-size="17">ReliabilityMiddleware::run()</text>
-  <text x="790" y="366" class="s">sub-task → verifier (settle + hold)</text>
-  <text x="790" y="390" class="s">fail → classify → correlated?</text>
-  <text x="790" y="414" class="s">→ robot-only rollback → new strategy</text>
-  <text x="790" y="438" class="s">never repeat a failed strategy</text>
-  <text x="790" y="462" class="s">ladder exhausted → escalate to human</text>
-  <text x="790" y="484" class="s">qnx_timer.cpp · middleware.cpp</text>
+  <rect x="772" y="166" width="324" height="336" rx="10" class="hot"/>
+  <text x="790" y="194" class="k" fill="#C2410C">1 kHz CONTROL + SIMPLEX SHIELD</text>
+  <text x="790" y="220" class="m">timer_create → SIGEV_PULSE</text>
+  <text x="790" y="244" class="s">SCHED_FIFO/SPORADIC · pthread_cluster_set</text>
+  <text x="790" y="272" class="t" font-size="16" fill="#C2410C">SafetyShield::project() [O(1), 0 alloc]</text>
+  <text x="790" y="296" class="s">• Vel/Accel clamping + NaN guard</text>
+  <text x="790" y="318" class="s">• Circle &amp; Polygon Surgical No-Go CBF</text>
+  <text x="790" y="340" class="s">• SHIELD_INTERVENTION pulse count</text>
+  <text x="790" y="370" class="t" font-size="16">ReliabilityMiddleware + TinyMLP</text>
+  <text x="790" y="394" class="s">8→32→32→2 MLP · independent verifier</text>
+  <text x="790" y="418" class="s">correlated fail → robot-only rollback</text>
+  <text x="790" y="442" class="s">posterior strategy · proactive transfer</text>
+  <text x="790" y="468" class="s">safety_shield.cpp · nn_policy.cpp</text>
 
-  <rect x="444" y="346" width="300" height="146" rx="10" class="box"/>
-  <text x="462" y="374" class="k">FAILURE LIBRARY</text>
-  <text x="462" y="402" class="s">(sub-task, mode, strategy) →</text>
-  <text x="462" y="426" class="s">successes / tries, Beta prior</text>
-  <text x="462" y="450" class="s">saved atomically every episode,</text>
-  <text x="462" y="474" class="s">reloaded after a restart</text>
+  <rect x="444" y="334" width="300" height="168" rx="10" class="box"/>
+  <text x="462" y="362" class="k">BAYESIAN FAILURE LIBRARY</text>
+  <text x="462" y="390" class="s">(subtask, mode, strategy) →</text>
+  <text x="462" y="414" class="s">Beta posterior + shared-cause fix</text>
+  <text x="462" y="438" class="s">atomic write+rename per episode;</text>
+  <text x="462" y="462" class="s">survives HAM &amp; driver restarts</text>
+  <text x="462" y="486" class="s">retry_policy.cpp · strategies.cpp</text>
 
-  <rect x="444" y="516" width="652" height="140" rx="10" class="box"/>
-  <text x="462" y="544" class="k">SLOG2 BUFFER "relmw" · LATENCY HISTOGRAM</text>
-  <text x="462" y="572" class="m">slog2_register / vslog2f   ·   slog2info -b relmw</text>
-  <text x="462" y="600" class="s">release latency p50 / p99 / max and deadline misses, O(1), no allocation</text>
-  <text x="462" y="626" class="s">on the tick path (test_rt_noalloc)  ·  qnx_log.cpp, latency.cpp</text>
+  <rect x="444" y="522" width="652" height="146" rx="10" class="box"/>
+  <text x="462" y="550" class="k">SLOG2 BUFFER "relmw" · ZERO-ALLOC HISTOGRAM · TELEMETRY RING</text>
+  <text x="462" y="578" class="m">slog2_register / vslog2f  ·  LatencyStats O(1)  ·  TelemetryRing (128 B)</text>
+  <text x="462" y="606" class="s">0 heap allocations across wait_tick, TinyMLP::act, SafetyShield::project, RemoteRobot::step</text>
+  <text x="462" y="632" class="s">verified by operator-new interception in tests/test_rt_noalloc.cpp (10 cases)</text>
 
   <!-- robot driver process -->
-  <rect x="1180" y="300" width="380" height="380" rx="14" class="proc"/>
-  <text x="1204" y="332" class="t">relmw_robotd</text>
-  <text x="1356" y="332" class="s">apps/relmw_robotd.cpp</text>
-  <rect x="1204" y="352" width="332" height="150" rx="10" class="box"/>
-  <text x="1222" y="380" class="k">RESOURCE MANAGER /dev/robot0</text>
-  <text x="1222" y="408" class="s">fixed-size _IO_MSG requests</text>
-  <text x="1222" y="432" class="s">checks mgrid, open mode, lengths</text>
-  <text x="1222" y="456" class="s">MsgReply · _RESMGR_NOREPLY</text>
-  <text x="1222" y="484" class="s">qnx_robot_link.cpp</text>
-  <rect x="1204" y="520" width="332" height="136" rx="10" class="box"/>
-  <text x="1222" y="548" class="k">ROBOT + GROUND TRUTH</text>
-  <text x="1222" y="576" class="s">today: deterministic PushSim2D</text>
-  <text x="1222" y="600" class="s">tomorrow: the real arm driver</text>
-  <text x="1222" y="630" class="s">RobotServer::handle()</text>
+  <rect x="1180" y="296" width="380" height="394" rx="14" class="proc"/>
+  <text x="1204" y="328" class="t">relmw_robotd</text>
+  <text x="1356" y="328" class="s">apps/relmw_robotd.cpp</text>
+  <rect x="1204" y="348" width="332" height="154" rx="10" class="box"/>
+  <text x="1222" y="376" class="k">RESOURCE MANAGER /dev/robot0</text>
+  <text x="1222" y="404" class="s">fixed 64-B Request / 88-B Reply</text>
+  <text x="1222" y="428" class="s">_IO_MSG · mgrid · open-mode check</text>
+  <text x="1222" y="452" class="s">MsgReply · _NTO_CHF_INHERIT_RUNMASK</text>
+  <text x="1222" y="480" class="s">qnx_robot_link.cpp</text>
+  <rect x="1204" y="520" width="332" height="148" rx="10" class="box"/>
+  <text x="1222" y="548" class="k">SURGICAL / INDUSTRIAL CELL SIM</text>
+  <text x="1222" y="576" class="s">deterministic PushSim2D + overhead</text>
+  <text x="1222" y="600" class="s">camera verifier (0 false positives)</text>
+  <text x="1222" y="626" class="s">RobotServer::handle()</text>
 
   <!-- HAM -->
-  <rect x="1180" y="120" width="380" height="150" rx="10" class="box" stroke="#B42318"/>
-  <text x="1200" y="150" class="k" fill="#B42318">HIGH AVAILABILITY MANAGER</text>
-  <text x="1200" y="180" class="s">CONDDEATH → restart (both processes)</text>
-  <text x="1200" y="206" class="s">heartbeat missed → kill → restart</text>
-  <text x="1200" y="232" class="m">relmw_ham_setup --name …</text>
-  <text x="1200" y="256" class="s">ham_attach · ham_action_restart</text>
+  <rect x="1180" y="114" width="380" height="154" rx="10" class="box" stroke="#B42318"/>
+  <text x="1200" y="144" class="k" fill="#B42318">HIGH AVAILABILITY MANAGER</text>
+  <text x="1200" y="174" class="s">CONDDEATH → restart supervisor/robotd</text>
+  <text x="1200" y="200" class="s">CONDHBEATMISSEDHIGH → slay + restart</text>
+  <text x="1200" y="226" class="m">relmw_ham_setup --name …</text>
+  <text x="1200" y="252" class="s">process + task dual-layer self-healing</text>
 
   <!-- arrows -->
-  <path class="ln" d="M370,230 L444,230" marker-end="url(#a)"/>
-  <text x="372" y="218" class="lab">open/read/</text><text x="372" y="252" class="lab">write</text>
-  <path class="ln" d="M370,455 C400,455 400,300 444,300" marker-end="url(#a)"/>
-  <path class="ln" d="M744,246 L772,246" marker-end="url(#a)"/>
-  <path class="ln" d="M772,420 L744,420" marker-end="url(#a)"/>
-  <path class="lo" d="M1096,400 L1204,400" marker-end="url(#o)"/>
-  <path class="lo" d="M1204,470 L1096,470" marker-end="url(#o)"/>
-  <text x="1104" y="390" class="lab" fill="#C2410C">MsgSend</text>
-  <text x="1104" y="492" class="lab" fill="#C2410C">MsgReply</text>
-  <path class="ln" d="M1370,270 L1370,300" marker-end="url(#a)" stroke="#B42318"/>
-  <path class="ln" d="M1180,200 L1120,200" marker-end="url(#a)" stroke="#B42318"/>
+  <path class="ln" d="M370,215 L444,215" marker-end="url(#a)"/>
+  <text x="373" y="204" class="lab">cat/echo</text>
+  <path class="ln" d="M370,415 C400,415 400,280 444,280" marker-end="url(#a)"/>
+  <path class="lg" d="M444,595 L370,595" marker-end="url(#g)"/>
+  <text x="373" y="585" class="lab" fill="#2F7D4F">128B UDP</text>
+  <path class="ln" d="M744,240 L772,240" marker-end="url(#a)"/>
+  <path class="ln" d="M772,418 L744,418" marker-end="url(#a)"/>
+  <path class="lo" d="M1096,396 L1204,396" marker-end="url(#o)"/>
+  <path class="lo" d="M1204,466 L1096,466" marker-end="url(#o)"/>
+  <text x="1104" y="386" class="lab" fill="#C2410C">MsgSend</text>
+  <text x="1104" y="488" class="lab" fill="#C2410C">MsgReply</text>
+  <path class="ln" d="M1370,268 L1370,296" marker-end="url(#a)" stroke="#B42318"/>
+  <path class="ln" d="M1180,196 L1120,196" marker-end="url(#a)" stroke="#B42318"/>
 
   <!-- bottom band -->
-  <rect x="40" y="710" width="1520" height="150" rx="10" class="box"/>
-  <text x="60" y="742" class="k">LEAST PRIVILEGE (secpol draft)</text>
-  <text x="60" y="770" class="s">types relmw_supervisor_t · relmw_robotd_t · relmw_operator_t; only pathspace + public_channel; config/secpol/relmw_secpol.txt</text>
-  <text x="60" y="808" class="k">ONE SOURCE TREE, THREE PLATFORM LAYERS</text>
-  <text x="60" y="836" class="s">portable core (src/core, no OS calls, bit-identical results)  +  src/platform/qnx (QNX 8.0)  |  src/platform/posix (Linux host)  |  compat/qnx_sim (QNX API simulation on Linux, not QNX)</text>
+  <rect x="40" y="720" width="1520" height="160" rx="10" class="box"/>
+  <text x="60" y="752" class="k">LEAST PRIVILEGE SECURITY POLICY (QNX 8.0 SECPOL)</text>
+  <text x="60" y="780" class="s">types relmw_supervisor_t · relmw_robotd_t · relmw_operator_t; scoped pathspace + channel connect; verified by tools/secpol_lint.py</text>
+  <text x="60" y="818" class="k">ONE ZERO-DEPENDENCY C++17 SOURCE TREE · THREE EXECUTION TARGETS</text>
+  <text x="60" y="846" class="s">portable core (Simplex SafetyShield + TinyMLP + FailureLibrary)  +  src/platform/qnx (QNX SDP 8.0)  |  src/platform/posix  |  compat/qnx_sim</text>
 </svg>

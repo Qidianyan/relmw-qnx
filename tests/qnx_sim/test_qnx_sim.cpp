@@ -145,6 +145,7 @@ TEST(timer_pulses_arrive_on_the_period_grid_and_stop_after_delete) {
       if (p.code == _PULSE_CODE_MINAVAIL + 9) break;
       ++seen_tick;
     }
+    CHECK(seen_tick >= 0);
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
     MsgSendPulse(coid, 10, _PULSE_CODE_MINAVAIL + 9, 0);
     MsgReceivePulse(chid, &p, sizeof p, nullptr);

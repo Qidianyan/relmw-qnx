@@ -6,6 +6,9 @@
 // fixed-size request and reads one fixed-size reply; transport failures return the errno (never
 // SIGPIPE: sends use MSG_NOSIGNAL; the reply is polled with a 2 s timeout).
 #define _POSIX_C_SOURCE 200809L
+#ifdef __APPLE__
+#define _DARWIN_C_SOURCE
+#endif
 #include "relmw/robot_link_os.hpp"
 
 #include <poll.h>
@@ -19,6 +22,19 @@
 
 namespace relmw {
 namespace {
+
+#ifdef __APPLE__
+constexpr int kRobotSockType = SOCK_STREAM;
+constexpr int kSendNoSigPipe = 0;
+inline void disable_sigpipe(int fd) {
+  int one = 1;
+  ::setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof one);
+}
+#else
+constexpr int kRobotSockType = SOCK_SEQPACKET;
+constexpr int kSendNoSigPipe = MSG_NOSIGNAL;
+inline void disable_sigpipe(int) {}
+#endif
 
 class PosixRobotTransport : public RobotTransport {
  public:
@@ -36,7 +52,7 @@ int PosixRobotTransport::call(const RobotRequest& req, RobotReply& rep) {
   const char* rq = reinterpret_cast<const char*>(&req);
   size_t left = sizeof req;
   while (left > 0) {                       // request: full message or errno
-    const ssize_t n = ::send(fd_, rq, left, MSG_NOSIGNAL);
+    const ssize_t n = ::send(fd_, rq, left, kSendNoSigPipe);
     if (n < 0) { if (errno == EINTR) continue; return errno ? errno : EIO; }
     if (n == 0) return EPIPE;
     rq += n; left -= static_cast<size_t>(n);
@@ -72,8 +88,9 @@ bool sockaddr_for(const std::string& path, sockaddr_un* out, std::string* err) {
 }  // namespace
 
 std::unique_ptr<RobotTransport> robot_connect(const std::string& path, std::string* err) {
-  const int fd = ::socket(AF_UNIX, SOCK_SEQPACKET, 0);
+  const int fd = ::socket(AF_UNIX, kRobotSockType, 0);
   if (fd < 0) { if (err) *err = std::strerror(errno); return nullptr; }
+  disable_sigpipe(fd);
   sockaddr_un addr{};
   if (!sockaddr_for(path, &addr, err)) { ::close(fd); return nullptr; }
   if (::connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof addr) < 0) {
@@ -87,8 +104,9 @@ std::unique_ptr<RobotTransport> robot_connect(const std::string& path, std::stri
 int robot_serve(const std::string& path, RobotServer& server, std::atomic<bool>& quit, std::string* err) {
   sockaddr_un addr{};
   if (!sockaddr_for(path, &addr, err)) return -1;
-  const int lfd = ::socket(AF_UNIX, SOCK_SEQPACKET, 0);
+  const int lfd = ::socket(AF_UNIX, kRobotSockType, 0);
   if (lfd < 0) { if (err) *err = std::strerror(errno); return -1; }
+  disable_sigpipe(lfd);
   ::unlink(path.c_str());                  // stale socket from a previous run
   if (::bind(lfd, reinterpret_cast<sockaddr*>(&addr), sizeof addr) < 0) {
     if (err) *err = std::strerror(errno) + std::string(" (") + path + ")";
@@ -113,6 +131,7 @@ int robot_serve(const std::string& path, RobotServer& server, std::atomic<bool>&
     if (cfd < 0) {
       cfd = ::accept(lfd, nullptr, nullptr);
       if (cfd < 0) { if (errno == EINTR || errno == ECONNABORTED) continue; if (err) *err = std::strerror(errno); break; }
+      disable_sigpipe(cfd);
       continue;
     }
     RobotRequest req{};
@@ -131,7 +150,7 @@ int robot_serve(const std::string& path, RobotServer& server, std::atomic<bool>&
     const char* wp = reinterpret_cast<const char*>(&rep);
     size_t wleft = sizeof rep;
     while (wleft > 0) {
-      const ssize_t n = ::send(cfd, wp, wleft, MSG_NOSIGNAL);
+      const ssize_t n = ::send(cfd, wp, wleft, kSendNoSigPipe);
       if (n < 0) { if (errno == EINTR) continue; dead = true; break; }
       if (n == 0) { dead = true; break; }
       wp += n; wleft -= static_cast<size_t>(n);

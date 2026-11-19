@@ -11,6 +11,9 @@
 //    "_cpu-N" pins to one CPU that must be both configured and allowed by the process mask.
 //  * watchdog_*(): no-ops (systemd or a shell loop plays the HAM role on the host).
 #define _POSIX_C_SOURCE 200809L
+#ifdef __APPLE__
+#define _DARWIN_C_SOURCE
+#endif
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE  // pthread_setaffinity_np / pthread_getaffinity_np / CPU_*
 #endif
@@ -25,6 +28,11 @@
 #include <string>
 #include <time.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <mach/mach_init.h>
+#include <mach/thread_act.h>
+#include <mach/thread_policy.h>
+#endif
 
 namespace relmw::platform {
 
@@ -50,11 +58,19 @@ std::int64_t PeriodicTimer::wait_tick() {
     const std::int64_t rel = next_release_;
     const std::int64_t now = now_ns();
     if (now < rel) {
+#ifdef __APPLE__
+      const std::int64_t rem = rel - now;
+      struct timespec ts;
+      ts.tv_sec = (time_t)(rem / 1000000000LL);
+      ts.tv_nsec = (long)(rem % 1000000000LL);
+      nanosleep(&ts, nullptr);
+#else
       // Absolute deadline: a spurious wakeup (EINTR) just re-loops and re-checks the flag.
       struct timespec ts;
       ts.tv_sec = (time_t)(rel / 1000000000LL);
       ts.tv_nsec = (long)(rel % 1000000000LL);
       clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, nullptr);
+#endif
       continue;
     }
     const std::int64_t late = now - rel;  // >= 0: only reached once the release is due
@@ -106,6 +122,72 @@ bool set_thread_sched(const std::string& policy, int priority, int low_priority,
 }
 
 // ---- CPU affinity (clusters) -------------------------------------------------------------
+#ifdef __APPLE__
+namespace {
+
+std::uint64_t host_all_mask() {
+  const long n = sysconf(_SC_NPROCESSORS_CONF);
+  if (n <= 0) return 1ULL;
+  if (n >= 64) return ~0ULL;
+  return (1ULL << n) - 1ULL;
+}
+
+thread_local std::uint64_t g_tls_mask = 0;
+
+std::uint64_t current_mask() {
+  if (g_tls_mask == 0) g_tls_mask = host_all_mask();
+  return g_tls_mask;
+}
+
+}  // namespace
+
+bool set_thread_cluster(const std::string& name, std::string* err) {
+  auto fail = [&](const std::string& why) {
+    if (err) *err = "EINVAL " + why;
+    return false;
+  };
+  if (name == "_all") {
+    g_tls_mask = host_all_mask();
+    thread_affinity_policy_data_t pol{THREAD_AFFINITY_TAG_NULL};
+    thread_policy_set(pthread_mach_thread_np(pthread_self()), THREAD_AFFINITY_POLICY,
+                      reinterpret_cast<thread_policy_t>(&pol), THREAD_AFFINITY_POLICY_COUNT);
+    return true;
+  }
+  const std::string pre = "_cpu-";
+  if (name.size() <= pre.size() || name.compare(0, pre.size(), pre) != 0)
+    return fail("cluster name must be \"_all\" or \"_cpu-N\" (custom clusters exist only on QNX, "
+                "defined by the startup program -c)");
+  const std::string digits = name.substr(pre.size());
+  for (char c : digits)
+    if (c < '0' || c > '9')
+      return fail("cluster name \"" + name + "\": N must be decimal digits only "
+                  "(custom clusters exist only on QNX)");
+  long n = 0;
+  for (char c : digits) {
+    n = n * 10 + (c - '0');
+    if (n > 1024) return fail("cpu index out of range in cluster name \"" + name + "\"");
+  }
+  const long nconf = sysconf(_SC_NPROCESSORS_CONF);
+  if (nconf < 0 || n >= nconf || n >= 64)
+    return fail("cpu " + std::to_string(n) + " >= configured CPUs (" + std::to_string(nconf < 0 ? 0 : nconf) + ")");
+  g_tls_mask = 1ULL << n;
+  thread_affinity_policy_data_t pol{static_cast<integer_t>(n + 1)};
+  thread_policy_set(pthread_mach_thread_np(pthread_self()), THREAD_AFFINITY_POLICY,
+                    reinterpret_cast<thread_policy_t>(&pol), THREAD_AFFINITY_POLICY_COUNT);
+  return true;
+}
+
+std::string thread_affinity_text() {
+  const std::uint64_t m = current_mask();
+  std::string cpus;
+  for (int cpu = 0; cpu < 64; ++cpu)
+    if (m & (1ULL << cpu)) { if (!cpus.empty()) cpus += ','; cpus += std::to_string(cpu); }
+  char hex[24];
+  std::snprintf(hex, sizeof hex, "%llx", static_cast<unsigned long long>(m));
+  return "cpus=" + (cpus.empty() ? std::string("-") : cpus) + " mask=0x" + hex;
+}
+
+#else
 namespace {
 
 // The process's initial allowed mask, captured once on first use (sched_getaffinity of pid 0): inside a container
@@ -181,6 +263,7 @@ std::string thread_affinity_text() {
   }
   return "cpus=" + (cpus.empty() ? std::string("-") : cpus) + " mask=0x" + hex;
 }
+#endif
 
 bool watchdog_attach(const char*, std::int64_t, int, int, std::string*) { return true; }
 

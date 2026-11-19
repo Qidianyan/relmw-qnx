@@ -35,6 +35,7 @@ done
 
 # 3. Deterministic benchmark: same N=100 seeds as the Linux host (B6: results must be bit-identical)
 step 20_bench "$BIN/relmw_bench" --n 100 --out "$OUT/bench"
+step 21_bench_splus_mlp_shield "$BIN/relmw_bench" --n 100 --warmup 40 --bias 0.12 --policy mlp --preset medical_vial --shield --export-replay "$OUT/bench_splus_replay.bin" --out "$OUT/bench_splus"
 
 # 4. Real-time supervisor runs: 1 kHz, 30 episodes, sched other vs fifo vs sporadic, idle and under CPU load (B7)
 run_sup() {  # $1=label $2=sched $3=load(0/1)
@@ -126,8 +127,11 @@ else
   note "80: only ${NCPU:-1} CPU(s) in this VM: affinity run skipped (boot QEMU with >= 2 vCPUs)"
 fi
 
-# 6. slog2 evidence (C3')
+# 6. slog2 + optional kernel tracelogger evidence (C3' + S+)
 step 50_slog2info sh -c "slog2info -b relmw | tail -200"
+if command -v tracelogger >/dev/null 2>&1; then
+  step 51_tracelogger sh -c "tracelogger -c -n 3 -f /dev/shmem/relmw.kev & TL=\$!; '$BIN/relmw_supervisor' --episodes 3 --period-us 1000 --sched fifo --prio 40 --shield --policy mlp --preset medical_vial --mount /dev/relmw_tr >/dev/null 2>&1; wait \$TL 2>/dev/null || true; command -v traceprinter >/dev/null 2>&1 && traceprinter -f /dev/shmem/relmw.kev | head -n 250 > '$OUT/kernel_trace.txt'; rm -f /dev/shmem/relmw.kev"
+fi
 
 # 7. HAM: restart on death (C4'). Needs the ham manager running; start it if present and not running.
 if command -v ham >/dev/null; then

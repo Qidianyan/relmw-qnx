@@ -9,8 +9,13 @@
 static inline void __qnxsim_sigev_pulse_init(struct sigevent* e, int coid, short priority, short code, void* value) {
   e->sigev_notify = SIGEV_PULSE;
   e->sigev_signo = coid;
+#ifdef __APPLE__
+  uintptr_t packed = ((uintptr_t)(uint16_t)priority) | (((uintptr_t)(uint16_t)code) << 16);
+  e->sigev_notify_attributes = (pthread_attr_t*)packed;
+#else
   e->_sigev_un._pad[0] = priority;
   e->_sigev_un._pad[1] = code;
+#endif
   e->sigev_value.sival_ptr = value;
 }
 #define SIGEV_PULSE_INIT(e, coid, prio, code, val) \
